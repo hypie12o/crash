@@ -1,0 +1,1630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Expensive Everything — Absolute Maximum Overkill</title>
+<style>
+  html, body {
+    margin: 0; height: 100%; background: #000; overflow: hidden;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+  }
+  #main { display: block; width: 100vw; height: 100vh; }
+
+  .panel {
+    position: fixed;
+    border: 1px solid #ffffff22;
+    background: #000;
+    box-shadow: 0 0 24px #000c;
+    overflow: hidden;
+  }
+  #panel-particles { right: 12px; bottom: 12px; width: 340px; height: 250px; }
+  #panel-texture   { right: 12px; top:    12px; width: 340px; height: 250px; }
+  #panel-layout    { left:  12px; top:    12px; width: 300px; height: 200px; }
+  .panel canvas { display: block; width: 100%; height: 100%; }
+  .label {
+    position: absolute; left: 6px; top: 4px;
+    color: #9fe; font-size: 10px; letter-spacing: .06em;
+    text-shadow: 0 0 6px #000; pointer-events: none;
+  }
+  .thrash-cell {
+    position: relative;
+    display: inline-block;
+    width: 6px; height: 6px;
+    margin: 0; padding: 0;
+    background: #1a2a3a;
+  }
+  #hud {
+    position: fixed; left: 10px; bottom: 8px;
+    color: #8fe3c0; font: 11px/1.45 ui-monospace, monospace;
+    white-space: pre; opacity: .92; text-shadow: 0 0 6px #000;
+    pointer-events: none;
+    max-width: calc(100vw - 20px);
+  }
+  #err {
+    position: fixed; inset: 0; display: none; place-content: center;
+    padding: 40px; color: #ff9c9c; background: #100606;
+    font: 12px/1.5 ui-monospace, monospace; white-space: pre-wrap; overflow: auto;
+  }
+  #warn {
+    position: fixed; left: 12px; top: 224px;
+    color: #ffb36b; font-size: 11px; line-height: 1.4;
+    text-shadow: 0 0 6px #000; opacity: .9;
+    pointer-events: none; max-width: 300px;
+    background: #000a; padding: 6px 8px; border-radius: 4px;
+  }
+  #audio-gate {
+    position: fixed; inset: 0; z-index: 9999;
+    display: grid; place-items: center;
+    background: #000c; color: #9fe;
+    font: 14px/1.6 ui-monospace, monospace;
+    text-align: center; cursor: pointer; padding: 40px;
+  }
+  #audio-gate.hidden { display: none; }
+</style>
+</head>
+<body>
+<canvas id="main"></canvas>
+
+<div class="panel" id="panel-layout">
+  <div id="thrash-target"></div>
+  <div class="label">DOM layout thrash · 600 children · read/write loop</div>
+</div>
+
+<div class="panel" id="panel-texture">
+  <canvas id="texDemo"></canvas>
+  <div class="label">RTT ping-pong · 4096² texture · 32-tap blur</div>
+</div>
+
+<div class="panel" id="panel-particles">
+  <canvas id="particles"></canvas>
+  <div class="label">3000 draw calls / frame</div>
+</div>
+
+<div id="warn">
+This page is intentionally excessive and will freeze your tab.<br>
+It runs heavy WebGL, 16 workers, tight JS loops, layout thrashing,<br>
+many timers, a 32-oscillator convolution reverb, repeated multi-MB<br>
+ArrayBuffer allocations, massive JSON.parse, and WebAssembly<br>
+Memory.grow(). Close the tab to stop it.
+</div>
+
+<div id="hud"></div>
+<pre id="err"></pre>
+
+<div id="audio-gate">click anywhere to start audio + let the page burn</div>
+
+<script>
+(() => {
+'use strict';
+
+// ==================================================================
+// Error surface
+// ==================================================================
+const errBox = document.getElementById('err');
+function fatal(msg) {
+  errBox.style.display = 'grid';
+  errBox.textContent = msg;
+  console.error(msg);
+  throw new Error(msg);
+}
+window.addEventListener('error', (e) => {
+  console.error('Uncaught:', e.error || e.message);
+});
+
+const T0 = performance.now();
+const nowSec = () => (performance.now() - T0) * 0.001;
+
+// ==================================================================
+// Shared GL helpers
+// ==================================================================
+function compile(gl, type, src, name) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+    fatal(name + ' shader compile error:\n\n' +
+          gl.getShaderInfoLog(s) + '\n\n--- source ---\n' + src);
+  }
+  return s;
+}
+function buildProgram(gl, vsSrc, fsSrc, name) {
+  const vs = compile(gl, gl.VERTEX_SHADER, vsSrc, name + ' VS');
+  const fs = compile(gl, gl.FRAGMENT_SHADER, fsSrc, name + ' FS');
+  const p = gl.createProgram();
+  gl.attachShader(p, vs);
+  gl.attachShader(p, fs);
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+    fatal(name + ' link error: ' + gl.getProgramInfoLog(p));
+  }
+  gl.deleteShader(vs);
+  gl.deleteShader(fs);
+  return p;
+}
+function makeFSQuad(gl) {
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER,
+    new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  return buf;
+}
+function bindFSQuad(gl, buf, prog) {
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  const loc = gl.getAttribLocation(prog, 'aPos');
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+}
+function makeFBO(gl, w, h) {
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0,
+                gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  const fb = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
+                          gl.TEXTURE_2D, tex, 0);
+  const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  if (status !== gl.FRAMEBUFFER_COMPLETE) {
+    fatal('FBO incomplete: 0x' + status.toString(16));
+  }
+  return { fb, tex, w, h };
+}
+
+const VS_QUAD = `
+  attribute vec2 aPos;
+  varying vec2 vUv;
+  void main() {
+    vUv = aPos * 0.5 + 0.5;
+    gl_Position = vec4(aPos, 0.0, 1.0);
+  }
+`;
+
+// ==================================================================
+// CONTEXT 1 — Main raymarcher
+// ==================================================================
+(function mainRenderer() {
+  const canvas = document.getElementById('main');
+  const gl = canvas.getContext('webgl', {
+    antialias: false, alpha: false, depth: false, stencil: false,
+    powerPreference: 'high-performance', preserveDrawingBuffer: false,
+  });
+  if (!gl) fatal('WebGL unavailable (main).');
+
+  const prec = gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT);
+  const PREC = (prec && prec.precision > 0) ? 'highp' : 'mediump';
+
+  const RES_SCALE    = 4.0;
+  const DPR_CAP      = 2.0;
+  const MAX_PIXELS   = 48 * 1024 * 1024;
+  const MAX_STEPS    = 512;
+  const ITER         = 14;
+  const SHADOW_STEPS = 64;
+  const AO_STEPS     = 10;
+
+  // ---- bumped high-res noise texture 4096² ----
+  const NOISE_SIZE = 4096;
+  const FS_NOISE = `
+    precision ${PREC} float;
+    varying vec2 vUv;
+    float hash(vec2 p) {
+      p = fract(p * vec2(123.34, 456.21));
+      p += dot(p, p + 45.32);
+      return fract(p.x * p.y);
+    }
+    float vnoise(vec2 p) {
+      vec2 i = floor(p), f = fract(p);
+      f = f * f * (3.0 - 2.0 * f);
+      float a = hash(i);
+      float b = hash(i + vec2(1.0, 0.0));
+      float c = hash(i + vec2(0.0, 1.0));
+      float d = hash(i + vec2(1.0, 1.0));
+      return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+    }
+    float fbm(vec2 p) {
+      float s = 0.0, a = 0.5;
+      for (int i = 0; i < 8; i++) {
+        s += a * vnoise(p);
+        p = p * 2.03 + 11.7;
+        a *= 0.5;
+      }
+      return s;
+    }
+    void main() {
+      vec2 p = vUv * 96.0;
+      float r = fbm(p);
+      float g = fbm(p + vec2(31.4, 17.3));
+      float b = fbm(p + vec2(91.7, 53.1));
+      float a = fbm(p + vec2(11.1, 77.7));
+      gl_FragColor = vec4(r, g, b, a);
+    }
+  `;
+  const progNoise = buildProgram(gl, VS_QUAD, FS_NOISE, 'noise');
+  const noiseFBO = makeFBO(gl, NOISE_SIZE, NOISE_SIZE);
+  {
+    const quad = makeFSQuad(gl);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, noiseFBO.fb);
+    gl.viewport(0, 0, NOISE_SIZE, NOISE_SIZE);
+    gl.useProgram(progNoise);
+    bindFSQuad(gl, quad, progNoise);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.deleteBuffer(quad);
+  }
+
+  const FS_RAY = `
+    precision ${PREC} float;
+    varying vec2 vUv;
+    uniform vec2 uResolution;
+    uniform float uTime;
+    uniform sampler2D uNoise;
+
+    #define MAX_STEPS     ${MAX_STEPS}
+    #define MAX_DIST      32.0
+    #define SURF          0.00020
+    #define ITER          ${ITER}
+    #define SHADOW_STEPS  ${SHADOW_STEPS}
+    #define AO_STEPS      ${AO_STEPS}
+
+    float mandelbulb(vec3 pos) {
+      vec3 z = pos;
+      float dr = 1.0;
+      float r = 0.0;
+      for (int i = 0; i < ITER; i++) {
+        r = length(z);
+        if (r > 2.0) break;
+        float theta = acos(clamp(z.z / r, -1.0, 1.0));
+        float phi   = atan(z.y, z.x);
+        float zr = pow(r, 8.0);
+        dr = zr * 8.0 * dr / r + 1.0;
+        theta *= 8.0;
+        phi   *= 8.0;
+        z = zr * vec3(sin(theta) * cos(phi),
+                      sin(theta) * sin(phi),
+                      cos(theta)) + pos;
+      }
+      return 0.5 * log(r) * r / dr;
+    }
+
+    mat3 rotY(float a) {
+      float c = cos(a), s = sin(a);
+      return mat3(c, 0.0, -s, 0.0, 1.0, 0.0, s, 0.0, c);
+    }
+    mat3 rotX(float a) {
+      float c = cos(a), s = sin(a);
+      return mat3(1.0, 0.0, 0.0, 0.0, c, s, 0.0, -s, c);
+    }
+
+    float map(vec3 p) {
+      p = rotY(uTime * 0.12) * rotX(uTime * 0.05) * p;
+      float s = 1.18;
+      return mandelbulb(p * s) / s;
+    }
+
+    mat3 setCamera(vec3 ro, vec3 ta, float roll) {
+      vec3 cw = normalize(ta - ro);
+      vec3 cp = vec3(sin(roll), cos(roll), 0.0);
+      vec3 cu = normalize(cross(cw, cp));
+      vec3 cv = cross(cu, cw);
+      return mat3(cu, cv, cw);
+    }
+
+    vec3 calcNormal(vec3 p) {
+      vec2 e = vec2(0.0007, 0.0);
+      return normalize(vec3(
+        map(p + e.xyy) - map(p - e.xyy),
+        map(p + e.yxy) - map(p - e.yxy),
+        map(p + e.yyx) - map(p - e.yyx)
+      ));
+    }
+
+    float calcAO(vec3 p, vec3 n) {
+      float occ = 0.0, sca = 1.0;
+      for (int i = 0; i < AO_STEPS; i++) {
+        float h = 0.01 + 0.13 * float(i) / float(AO_STEPS - 1);
+        float d = map(p + n * h);
+        occ += (h - d) * sca;
+        sca *= 0.85;
+      }
+      return clamp(1.0 - 2.0 * occ, 0.0, 1.0);
+    }
+
+    float softShadow(vec3 ro, vec3 rd, float mint, float maxt, float k) {
+      float res = 1.0, t = mint;
+      for (int i = 0; i < SHADOW_STEPS; i++) {
+        float h = map(ro + rd * t);
+        res = min(res, k * h / t);
+        t += clamp(h, 0.008, 0.20);
+        if (res < 0.004 || t > maxt) break;
+      }
+      return clamp(res, 0.0, 1.0);
+    }
+
+    vec2 raymarch(vec3 ro, vec3 rd) {
+      float t = 0.0;
+      for (int i = 0; i < MAX_STEPS; i++) {
+        float d = map(ro + rd * t);
+        if (d < SURF) return vec2(t, 1.0);
+        t += d * 0.9;
+        if (t > MAX_DIST) break;
+      }
+      return vec2(t, -1.0);
+    }
+
+    void main() {
+      vec2 fragCoord = vUv * uResolution;
+      vec2 p = (2.0 * fragCoord - uResolution) / uResolution.y;
+      vec2 q = fragCoord / uResolution;
+
+      float t   = uTime * 0.18;
+      float an  = 0.4 * t;
+      float rad = 3.0;
+      vec3 ro = vec3(rad * cos(an), 1.3 + 0.5 * sin(t * 0.7), rad * sin(an));
+      vec3 ta = vec3(0.0);
+
+      mat3 ca = setCamera(ro, ta, 0.0);
+      vec3 rd = ca * normalize(vec3(p, 1.75));
+
+      float vig = pow(max(0.0, 1.0 - length(q - 0.5) * 1.4), 2.0);
+      vec3 col = vec3(0.012, 0.018, 0.032) + vec3(0.22, 0.34, 0.58) * vig;
+
+      vec2 res = raymarch(ro, rd);
+      if (res.y > 0.0) {
+        float tHit = res.x;
+        vec3 pos = ro + rd * tHit;
+        vec3 nor = calcNormal(pos);
+
+        vec3 lig = normalize(vec3(0.65, 0.80, -0.45));
+        float occ = calcAO(pos, nor);
+        float sha = softShadow(pos + nor * 0.0015, lig, 0.02, 7.0, 10.0);
+
+        vec3 nA = texture2D(uNoise, pos.xy * 0.35 + 0.5).rgb;
+        vec3 nB = texture2D(uNoise, pos.zx * 0.55 + 0.5).rgb;
+        vec3 nC = texture2D(uNoise, pos.yz * 0.20 + 0.5).rgb;
+
+        vec3 mate = 0.5 + 0.5 * cos(vec3(0.0, 1.1, 2.2)
+                   + length(pos) * 3.5 + uTime * 0.25);
+        mate *= 0.55 + 1.1 * nA;
+        mate *= 0.70 + 0.6 * nB;
+        mate = mix(mate, mate * nC * 1.6, 0.25);
+
+        float dif = clamp(dot(nor, lig), 0.0, 1.0) * sha;
+        float sky = clamp(0.5 + 0.5 * nor.y, 0.0, 1.0) * occ;
+        float bnc = clamp(0.5 - 0.5 * nor.y, 0.0, 1.0) * occ;
+        float fre = pow(clamp(1.0 + dot(nor, rd), 0.0, 1.0), 3.0);
+
+        vec3 lin = vec3(0.0);
+        lin += 3.6 * dif * vec3(1.00, 0.88, 0.72);
+        lin += 1.15 * sky * vec3(0.30, 0.48, 0.95);
+        lin += 0.55 * bnc * vec3(0.55, 0.38, 0.26);
+        lin += 0.95 * fre * occ * vec3(0.60, 0.70, 1.00);
+
+        col = mate * lin;
+        col = mix(col, vec3(0.012, 0.018, 0.032),
+                  1.0 - exp(-0.010 * tHit * tHit));
+      }
+
+      col = col / (1.0 + col);
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `;
+  const progRay = buildProgram(gl, VS_QUAD, FS_RAY, 'raymarch');
+  const uRay = {
+    resolution: gl.getUniformLocation(progRay, 'uResolution'),
+    time:       gl.getUniformLocation(progRay, 'uTime'),
+    noise:      gl.getUniformLocation(progRay, 'uNoise'),
+  };
+
+  const FS_BRIGHT = `
+    precision ${PREC} float;
+    varying vec2 vUv;
+    uniform sampler2D uScene;
+    uniform float uThreshold;
+    void main() {
+      vec3 c = texture2D(uScene, vUv).rgb;
+      float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
+      float w = smoothstep(uThreshold, uThreshold + 0.4, lum);
+      gl_FragColor = vec4(c * w, 1.0);
+    }
+  `;
+  const progBright = buildProgram(gl, VS_QUAD, FS_BRIGHT, 'bright');
+  const uBright = {
+    scene:     gl.getUniformLocation(progBright, 'uScene'),
+    threshold: gl.getUniformLocation(progBright, 'uThreshold'),
+  };
+
+  const FS_BLUR = `
+    precision ${PREC} float;
+    varying vec2 vUv;
+    uniform sampler2D uTex;
+    uniform vec2 uDir;
+    void main() {
+      float w0 = 0.2270270270;
+      float w1 = 0.1945945946;
+      float w2 = 0.1216216216;
+      float w3 = 0.0540540541;
+      float w4 = 0.0162162162;
+      vec3 s = texture2D(uTex, vUv).rgb * w0;
+      s += texture2D(uTex, vUv + uDir * 1.0).rgb * w1;
+      s += texture2D(uTex, vUv - uDir * 1.0).rgb * w1;
+      s += texture2D(uTex, vUv + uDir * 2.0).rgb * w2;
+      s += texture2D(uTex, vUv - uDir * 2.0).rgb * w2;
+      s += texture2D(uTex, vUv + uDir * 3.0).rgb * w3;
+      s += texture2D(uTex, vUv - uDir * 3.0).rgb * w3;
+      s += texture2D(uTex, vUv + uDir * 4.0).rgb * w4;
+      s += texture2D(uTex, vUv - uDir * 4.0).rgb * w4;
+      gl_FragColor = vec4(s, 1.0);
+    }
+  `;
+  const progBlur = buildProgram(gl, VS_QUAD, FS_BLUR, 'blur');
+  const uBlur = {
+    tex: gl.getUniformLocation(progBlur, 'uTex'),
+    dir: gl.getUniformLocation(progBlur, 'uDir'),
+  };
+
+  const FS_POST = `
+    precision ${PREC} float;
+    varying vec2 vUv;
+    uniform sampler2D uScene;
+    uniform sampler2D uBloom;
+    uniform vec2 uResolution;
+    uniform float uTime;
+    uniform float uBloomStrength;
+
+    float hash(vec2 p) {
+      return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+    }
+
+    void main() {
+      vec2 uv = vUv;
+      vec2 d = uv - 0.5;
+      float r2 = dot(d, d);
+
+      float ca = 0.008 * r2;
+      vec2 dir = normalize(d + 1e-6);
+      vec3 scene;
+      scene.r = texture2D(uScene, uv + dir * ca).r;
+      scene.g = texture2D(uScene, uv).g;
+      scene.b = texture2D(uScene, uv - dir * ca).b;
+
+      vec3 bloom = texture2D(uBloom, uv).rgb;
+      vec3 col = scene + bloom * uBloomStrength;
+
+      col *= 1.0 - 0.55 * r2;
+
+      float g = hash(uv * uResolution + fract(uTime) * 137.0);
+      col += (g - 0.5) * 0.035;
+
+      col = pow(max(col, 0.0), vec3(0.4545));
+
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `;
+  const progPost = buildProgram(gl, VS_QUAD, FS_POST, 'post');
+  const uPost = {
+    scene:         gl.getUniformLocation(progPost, 'uScene'),
+    bloom:         gl.getUniformLocation(progPost, 'uBloom'),
+    resolution:    gl.getUniformLocation(progPost, 'uResolution'),
+    time:          gl.getUniformLocation(progPost, 'uTime'),
+    bloomStrength: gl.getUniformLocation(progPost, 'uBloomStrength'),
+  };
+
+  let sceneFBO = null, brightFBO = null, blurAFBO = null, blurBFBO = null;
+  const quadBuf = makeFSQuad(gl);
+
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP) * RES_SCALE;
+    let w = Math.max(1, Math.floor(canvas.clientWidth  * dpr));
+    let h = Math.max(1, Math.floor(canvas.clientHeight * dpr));
+
+    const px = w * h;
+    if (px > MAX_PIXELS) {
+      const s = Math.sqrt(MAX_PIXELS / px);
+      w = Math.max(1, Math.floor(w * s));
+      h = Math.max(1, Math.floor(h * s));
+    }
+
+    if (canvas.width === w && canvas.height === h && sceneFBO) return;
+    canvas.width = w; canvas.height = h;
+
+    for (const f of [sceneFBO, brightFBO, blurAFBO, blurBFBO]) {
+      if (f) { gl.deleteFramebuffer(f.fb); gl.deleteTexture(f.tex); }
+    }
+    sceneFBO  = makeFBO(gl, w, h);
+    const hw  = Math.max(1, w >> 1);
+    const hh  = Math.max(1, h >> 1);
+    brightFBO = makeFBO(gl, hw, hh);
+    blurAFBO  = makeFBO(gl, hw, hh);
+    blurBFBO  = makeFBO(gl, hw, hh);
+  }
+
+  function passRaymarch(time) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, sceneFBO.fb);
+    gl.viewport(0, 0, sceneFBO.w, sceneFBO.h);
+    gl.useProgram(progRay);
+    bindFSQuad(gl, quadBuf, progRay);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, noiseFBO.tex);
+    gl.uniform1i(uRay.noise, 0);
+    gl.uniform2f(uRay.resolution, sceneFBO.w, sceneFBO.h);
+    gl.uniform1f(uRay.time, time);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+  function passBright() {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, brightFBO.fb);
+    gl.viewport(0, 0, brightFBO.w, brightFBO.h);
+    gl.useProgram(progBright);
+    bindFSQuad(gl, quadBuf, progBright);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, sceneFBO.tex);
+    gl.uniform1i(uBright.scene, 0);
+    gl.uniform1f(uBright.threshold, 0.55);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+  function passBlur(src, dst, dx, dy) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fb);
+    gl.viewport(0, 0, dst.w, dst.h);
+    gl.useProgram(progBlur);
+    bindFSQuad(gl, quadBuf, progBlur);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, src.tex);
+    gl.uniform1i(uBlur.tex, 0);
+    gl.uniform2f(uBlur.dir, dx / dst.w, dy / dst.h);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+  function passComposite(time) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.useProgram(progPost);
+    bindFSQuad(gl, quadBuf, progPost);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, sceneFBO.tex);
+    gl.uniform1i(uPost.scene, 0);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, blurBFBO.tex);
+    gl.uniform1i(uPost.bloom, 1);
+    gl.uniform2f(uPost.resolution, canvas.width, canvas.height);
+    gl.uniform1f(uPost.time, time);
+    gl.uniform1f(uPost.bloomStrength, 1.5);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  window.addEventListener('resize', resize, { passive: true });
+  resize();
+
+  window.__mainState = {
+    frame(time) {
+      resize();
+      passRaymarch(time);
+      passBright();
+      passBlur(brightFBO, blurAFBO, 1, 0);
+      passBlur(blurAFBO,  blurBFBO, 0, 1);
+      passComposite(time);
+      return {
+        info: `${sceneFBO.w}×${sceneFBO.h} · ${PREC} · ` +
+              `noise ${NOISE_SIZE}² · ITER ${ITER} · STEPS ${MAX_STEPS} · 5 passes`
+      };
+    }
+  };
+})();
+
+// ==================================================================
+// CONTEXT 2 — 3000 draw calls
+// ==================================================================
+(function particlesRenderer() {
+  const canvas = document.getElementById('particles');
+  const gl = canvas.getContext('webgl', {
+    antialias: false, alpha: false, depth: false, stencil: false,
+    powerPreference: 'high-performance', preserveDrawingBuffer: false,
+  });
+  if (!gl) { console.error('no WebGL (particles)'); return; }
+
+  const VS = `
+    attribute vec2 aPos;
+    uniform vec2 uCenter;
+    uniform float uSize;
+    uniform float uRot;
+    varying vec2 vUv;
+    void main() {
+      float c = cos(uRot), s = sin(uRot);
+      mat2 R = mat2(c, -s, s, c);
+      vec2 p = R * (aPos * uSize) + uCenter;
+      vUv = aPos * 0.5 + 0.5;
+      gl_Position = vec4(p, 0.0, 1.0);
+    }
+  `;
+  const FS = `
+    precision mediump float;
+    varying vec2 vUv;
+    uniform vec4 uColor;
+    uniform sampler2D uSprite;
+    void main() {
+      vec4 s = texture2D(uSprite, vUv);
+      gl_FragColor = vec4(uColor.rgb * s.rgb, uColor.a * s.a);
+    }
+  `;
+
+  const SPRITE = 512;   // bumped from 256 → 512
+  const sCanvas = document.createElement('canvas');
+  sCanvas.width = sCanvas.height = SPRITE;
+  const ctx2d = sCanvas.getContext('2d');
+  const grd = ctx2d.createRadialGradient(
+    SPRITE / 2, SPRITE / 2, 0, SPRITE / 2, SPRITE / 2, SPRITE / 2);
+  grd.addColorStop(0.00, 'rgba(255,255,255,1)');
+  grd.addColorStop(0.25, 'rgba(200,230,255,0.85)');
+  grd.addColorStop(0.60, 'rgba(90,150,255,0.3)');
+  grd.addColorStop(1.00, 'rgba(0,0,0,0)');
+  ctx2d.fillStyle = grd;
+  ctx2d.fillRect(0, 0, SPRITE, SPRITE);
+
+  const spriteTex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, spriteTex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, sCanvas);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+  const prog = buildProgram(gl, VS, FS, 'particles');
+  gl.useProgram(prog);
+
+  const quadBuf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+    -1, -1,  1, -1, -1,  1,
+    -1,  1,  1, -1,  1,  1,
+  ]), gl.STATIC_DRAW);
+
+  const aPos    = gl.getAttribLocation(prog, 'aPos');
+  const uCenter = gl.getUniformLocation(prog, 'uCenter');
+  const uSize   = gl.getUniformLocation(prog, 'uSize');
+  const uRot    = gl.getUniformLocation(prog, 'uRot');
+  const uColor  = gl.getUniformLocation(prog, 'uColor');
+  const uSprite = gl.getUniformLocation(prog, 'uSprite');
+
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+  gl.disable(gl.DEPTH_TEST);
+
+  const N = 3000;
+  const parts = new Array(N);
+  for (let i = 0; i < N; i++) {
+    parts[i] = {
+      x: Math.random() * 2 - 1, y: Math.random() * 2 - 1,
+      s: 0.008 + Math.random() * 0.05,
+      vr: (Math.random() * 2 - 1) * 2.5, r: Math.random() * 6.28,
+      dx: (Math.random() * 2 - 1) * 0.12,
+      dy: (Math.random() * 2 - 1) * 0.12,
+      hue: Math.random(),
+    };
+  }
+
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = Math.max(1, Math.floor(canvas.clientWidth  * dpr));
+    const h = Math.max(1, Math.floor(canvas.clientHeight * dpr));
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w; canvas.height = h;
+    }
+  }
+
+  window.__particlesState = {
+    frame(time) {
+      resize();
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.clearColor(0.02, 0.02, 0.04, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+
+      gl.useProgram(prog);
+      gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
+      gl.enableVertexAttribArray(aPos);
+      gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, spriteTex);
+      gl.uniform1i(uSprite, 0);
+
+      for (let i = 0; i < N; i++) {
+        const p = parts[i];
+        let x = p.x + p.dx * time;
+        let y = p.y + p.dy * time;
+        x = (((x + 1) % 2) + 2) % 2 - 1;
+        y = (((y + 1) % 2) + 2) % 2 - 1;
+
+        gl.uniform2f(uCenter, x, y);
+        gl.uniform1f(uSize, p.s);
+        gl.uniform1f(uRot, p.r + p.vr * time);
+
+        const hh = (p.hue + time * 0.05) % 1.0;
+        const r = 0.5 + 0.5 * Math.cos(hh * 6.283 + 0.0);
+        const g = 0.5 + 0.5 * Math.cos(hh * 6.283 + 2.1);
+        const b = 0.5 + 0.5 * Math.cos(hh * 6.283 + 4.2);
+        gl.uniform4f(uColor, r, g, b, 0.65);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+      }
+      return N;
+    }
+  };
+})();
+
+// ==================================================================
+// CONTEXT 3 — RTT ping-pong + 4096² texture + 32-tap blur
+// ==================================================================
+(function texDemoRenderer() {
+  const canvas = document.getElementById('texDemo');
+  const gl = canvas.getContext('webgl', {
+    antialias: false, alpha: false, depth: false, stencil: false,
+    powerPreference: 'high-performance', preserveDrawingBuffer: false,
+  });
+  if (!gl) { console.error('no WebGL (texDemo)'); return; }
+
+  const VS = `
+    attribute vec2 aPos;
+    varying vec2 vUv;
+    void main() {
+      vUv = aPos * 0.5 + 0.5;
+      gl_Position = vec4(aPos, 0.0, 1.0);
+    }
+  `;
+  const FS = `
+    precision highp float;
+    varying vec2 vUv;
+    uniform sampler2D uPrev;
+    uniform sampler2D uHighRes;
+    uniform float uTime;
+    uniform float uFirstFrame;
+    void main() {
+      vec2 uv = vUv;
+      vec2 c = uv - 0.5;
+      float a = 0.010;
+      float cs = cos(a), sn = sin(a);
+      c = mat2(cs, -sn, sn, cs) * c;
+      c *= 0.995;
+      vec2 uvPrev = c + 0.5 + vec2(0.0009 * sin(uTime * 0.7),
+                                   0.0011 * cos(uTime * 0.9));
+      vec3 prev = texture2D(uPrev, uvPrev).rgb;
+      // 32-tap blur
+      vec3 hr = vec3(0.0);
+      for (int i = 0; i < 32; i++) {
+        float fi = float(i);
+        float ang = fi * 0.19635;
+        float r = 0.010 * (1.0 + fi * 0.05);
+        vec2 off = vec2(cos(ang), sin(ang)) * r;
+        hr += texture2D(uHighRes, uv + off).rgb;
+      }
+      hr /= 32.0;
+      vec3 col = prev * 0.94 + hr * 0.06 + vec3(0.002, 0.003, 0.006);
+      col += uFirstFrame * texture2D(uHighRes, uv).rgb;
+      col = col / (1.0 + col * 0.3);
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `;
+
+  const prog = buildProgram(gl, VS, FS, 'texDemo');
+  gl.useProgram(prog);
+  const quadBuf = makeFSQuad(gl);
+  bindFSQuad(gl, quadBuf, prog);
+
+  const uPrev       = gl.getUniformLocation(prog, 'uPrev');
+  const uHighRes    = gl.getUniformLocation(prog, 'uHighRes');
+  const uTime       = gl.getUniformLocation(prog, 'uTime');
+  const uFirstFrame = gl.getUniformLocation(prog, 'uFirstFrame');
+
+  const HR = 4096;    // bumped from 2048² → 4096²
+  const FS_NOISE = `
+    precision highp float;
+    varying vec2 vUv;
+    float hash(vec2 p) {
+      p = fract(p * vec2(123.34, 456.21));
+      p += dot(p, p + 45.32);
+      return fract(p.x * p.y);
+    }
+    float vnoise(vec2 p) {
+      vec2 i = floor(p), f = fract(p);
+      f = f * f * (3.0 - 2.0 * f);
+      float a = hash(i);
+      float b = hash(i + vec2(1.0, 0.0));
+      float c = hash(i + vec2(0.0, 1.0));
+      float d = hash(i + vec2(1.0, 1.0));
+      return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+    }
+    float fbm(vec2 p) {
+      float s = 0.0, a = 0.5;
+      for (int i = 0; i < 7; i++) {
+        s += a * vnoise(p);
+        p = p * 2.07 + 13.1;
+        a *= 0.5;
+      }
+      return s;
+    }
+    void main() {
+      vec2 p = vUv * 64.0;
+      gl_FragColor = vec4(fbm(p), fbm(p + 11.3), fbm(p + 27.7), 1.0);
+    }
+  `;
+  const progNoise = buildProgram(gl, VS, FS_NOISE, 'texDemo-noise');
+
+  function makeTex(w, h) {
+    const t = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0,
+                  gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    return t;
+  }
+  function makeFB(tex) {
+    const fb = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
+                            gl.TEXTURE_2D, tex, 0);
+    return fb;
+  }
+
+  const hrTex = makeTex(HR, HR);
+  const hrFB  = makeFB(hrTex);
+  {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, hrFB);
+    gl.viewport(0, 0, HR, HR);
+    gl.useProgram(progNoise);
+    bindFSQuad(gl, quadBuf, progNoise);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  }
+
+  let pingTex = makeTex(2, 2);
+  let pongTex = makeTex(2, 2);
+  let pingFB  = makeFB(pingTex);
+  let pongFB  = makeFB(pongTex);
+  let firstFrame = 1;
+
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = Math.max(1, Math.floor(canvas.clientWidth  * dpr));
+    const h = Math.max(1, Math.floor(canvas.clientHeight * dpr));
+    if (canvas.width === w && canvas.height === h) return;
+    canvas.width = w; canvas.height = h;
+    gl.deleteTexture(pingTex);
+    gl.deleteTexture(pongTex);
+    gl.deleteFramebuffer(pingFB);
+    gl.deleteFramebuffer(pongFB);
+    pingTex = makeTex(w, h);
+    pongTex = makeTex(w, h);
+    pingFB  = makeFB(pingTex);
+    pongFB  = makeFB(pongTex);
+    firstFrame = 1;
+  }
+
+  window.__texState = {
+    frame(time) {
+      resize();
+      const w = canvas.width, h = canvas.height;
+
+      gl.bindFramebuffer(gl.FRAMEBUFFER, pongFB);
+      gl.viewport(0, 0, w, h);
+      gl.useProgram(prog);
+      bindFSQuad(gl, quadBuf, prog);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, pingTex);
+      gl.uniform1i(uPrev, 0);
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, hrTex);
+      gl.uniform1i(uHighRes, 1);
+      gl.uniform1f(uTime, time);
+      gl.uniform1f(uFirstFrame, firstFrame);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      firstFrame = 0;
+
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, w, h);
+      gl.useProgram(prog);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, pongTex);
+      gl.uniform1i(uPrev, 0);
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, hrTex);
+      gl.uniform1i(uHighRes, 1);
+      gl.uniform1f(uTime, time);
+      gl.uniform1f(uFirstFrame, 0);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+      let t = pingTex; pingTex = pongTex; pongTex = t;
+      let f = pingFB;  pingFB  = pongFB;  pongFB  = f;
+    }
+  };
+})();
+
+// ==================================================================
+// Tight main-thread loop
+// ==================================================================
+const MAIN_LOOP_BUDGET_MS = 90;
+let mainThreadIters = 0;
+let mainThreadRate  = 0;
+let mainThreadLastT = performance.now();
+let mainThreadLastI = 0;
+
+function burnMainThread(budgetMs) {
+  const start = performance.now();
+  let x = 0x9e3779b9 >>> 0;
+  let iters = 0;
+  while (performance.now() - start < budgetMs) {
+    for (let i = 0; i < 16384; i++) {
+      x = (x ^ (x << 13)) >>> 0;
+      x = (x ^ (x >>> 17)) >>> 0;
+      x = (x ^ (x << 5)) >>> 0;
+      x = (x + i) >>> 0;
+      let y = (x * 2654435761) >>> 0;
+      y ^= (y >>> 15);
+      y = (y * 2246822519) >>> 0;
+      x = (x ^ y) >>> 0;
+    }
+    iters += 16384;
+  }
+  mainThreadIters += iters;
+  const now = performance.now();
+  if (now - mainThreadLastT >= 500) {
+    mainThreadRate = (mainThreadIters - mainThreadLastI) /
+                     ((now - mainThreadLastT) / 1000);
+    mainThreadLastT = now;
+    mainThreadLastI = mainThreadIters;
+  }
+}
+
+// ==================================================================
+// Web Workers
+// ==================================================================
+const WORKER_SRC = `
+  'use strict';
+  const BATCH = 65536;
+  let totalIters = 0;
+  let lastReport = performance.now();
+  let lastTotal  = 0;
+  function hashWork(seed) {
+    let x = seed >>> 0;
+    for (let i = 0; i < BATCH; i++) {
+      x = (x ^ (x << 13)) >>> 0;
+      x = (x ^ (x >>> 17)) >>> 0;
+      x = (x ^ (x << 5)) >>> 0;
+      x = (x + i) >>> 0;
+      let y = (x * 2654435761) >>> 0;
+      y ^= (y >>> 15);
+      y = (y * 2246822519) >>> 0;
+      x = (x ^ y) >>> 0;
+    }
+    return x;
+  }
+  while (true) {
+    let acc = 0;
+    for (let b = 0; b < 8; b++) {
+      acc ^= hashWork((totalIters + b) >>> 0);
+      totalIters += BATCH;
+    }
+    const now = performance.now();
+    if (now - lastReport > 500) {
+      self.postMessage({
+        rate:  (totalIters - lastTotal) / ((now - lastReport) / 1000),
+        total: totalIters
+      });
+      lastReport = now;
+      lastTotal  = totalIters;
+    }
+  }
+`;
+
+const NUM_WORKERS = Math.min(16, Math.max(4, navigator.hardwareConcurrency || 8));
+const workerURL   = URL.createObjectURL(
+  new Blob([WORKER_SRC], { type: 'application/javascript' })
+);
+const workers     = [];
+const workerRates = new Array(NUM_WORKERS).fill(0);
+
+for (let i = 0; i < NUM_WORKERS; i++) {
+  try {
+    const w = new Worker(workerURL);
+    w.onmessage = (e) => {
+      if (e.data && typeof e.data.rate === 'number') {
+        workerRates[i] = e.data.rate;
+      }
+    };
+    w.onerror = (err) => {
+      console.error('Worker ' + i + ' error:', err.message || err);
+    };
+    workers.push(w);
+  } catch (err) {
+    console.error('Failed to start worker ' + i + ':', err);
+  }
+}
+
+// ==================================================================
+// DOM LAYOUT THRASHING
+// ==================================================================
+const thrashTarget = document.getElementById('thrash-target');
+const THRASH_CHILDREN = 600;
+{
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < THRASH_CHILDREN; i++) {
+    const d = document.createElement('div');
+    d.className = 'thrash-cell';
+    frag.appendChild(d);
+  }
+  thrashTarget.appendChild(frag);
+}
+const thrashCells = thrashTarget.children;
+
+let thrashReads = 0;
+let thrashRate  = 0;
+let thrashLastT = performance.now();
+let thrashLastR = 0;
+
+function thrashLayout() {
+  const n = thrashCells.length;
+  let acc = 0;
+  for (let i = 0; i < n; i++) {
+    const c = thrashCells[i];
+    const w  = c.offsetWidth;
+    const h  = c.offsetHeight;
+    const r  = c.getBoundingClientRect();
+    const st = c.scrollTop;
+    const ch = c.clientHeight;
+    const cw = c.clientWidth;
+    acc += w + h + r.width + r.height + st + ch + cw;
+
+    c.style.width  = (4 + (i % 5)) + 'px';
+    c.style.height = (4 + (i % 7)) + 'px';
+    c.style.paddingLeft = (i % 3) + 'px';
+    c.style.marginTop   = (i % 4) * 0.25 + 'px';
+    c.style.transform   = 'translateX(' + (i % 3) + 'px)';
+  }
+  thrashReads += n;
+
+  const now = performance.now();
+  if (now - thrashLastT >= 500) {
+    thrashRate = (thrashReads - thrashLastR) /
+                 ((now - thrashLastT) / 1000);
+    thrashLastT = now;
+    thrashLastR = thrashReads;
+  }
+}
+
+// ==================================================================
+// Timer storms
+// ==================================================================
+let intervalTicks = 0;
+const intervals = [];
+for (let i = 0; i < 8; i++) {
+  const id = setInterval(() => {
+    let s = 0;
+    const buf = new Uint32Array(512);
+    for (let k = 0; k < buf.length; k++) {
+      buf[k] = (Math.random() * 0xffffffff) >>> 0;
+    }
+    for (let k = 0; k < buf.length; k++) {
+      s = (s + (buf[k] ^ (buf[k] >>> 13))) >>> 0;
+    }
+    intervalTicks++;
+    if (i === 0 && thrashCells.length) {
+      thrashCells[0].style.opacity = (s & 1) ? '1' : '0.99';
+    }
+  }, i);
+  intervals.push(id);
+}
+
+let timeoutTicks = 0;
+function timeoutLoop() {
+  let s = 0;
+  for (let i = 0; i < 8192; i++) s = (s * 31 + i) >>> 0;
+  timeoutTicks++;
+  setTimeout(timeoutLoop, 0);
+}
+setTimeout(timeoutLoop, 0);
+
+let timeoutTicks2 = 0;
+function timeoutLoop2() {
+  let s = 0;
+  const a = new Float64Array(2048);
+  for (let i = 0; i < a.length; i++) a[i] = Math.sin(i * 0.001 + s);
+  for (let i = 0; i < a.length; i++) s += a[i] * a[i];
+  timeoutTicks2++;
+  setTimeout(timeoutLoop2, 0);
+}
+setTimeout(timeoutLoop2, 0);
+
+// ==================================================================
+// NEW — MEMORY BOMBS
+// ==================================================================
+
+// ---- 1. Repeated huge ArrayBuffer / typed array allocations ----
+let abAllocCount = 0;
+let abAllocBytes = 0;
+let abRate       = 0;
+let abLastT      = performance.now();
+let abLastBytes  = 0;
+
+function allocBigBuffers() {
+  // ~64 MB per cycle, dropped immediately so GC has to churn.
+  const SIZES = [
+    8 * 1024 * 1024,   // 8 MB ArrayBuffer
+    16 * 1024 * 1024,  // 16 MB Uint8Array
+    8 * 1024 * 1024,   // 8 MB Float64Array
+    32 * 1024 * 1024,  // 32 MB Int32Array
+  ];
+
+  for (const bytes of SIZES) {
+    try {
+      if (bytes % 8 === 0 && bytes >= 32 * 1024 * 1024) {
+        const t = new Int32Array(bytes / 4);
+        // touch a scattered sample so pages actually commit
+        for (let i = 0; i < t.length; i += 4096) t[i] = i;
+      } else if (bytes % 8 === 0) {
+        const t = new Float64Array(bytes / 8);
+        for (let i = 0; i < t.length; i += 8192) t[i] = i * 0.5;
+      } else {
+        const b = new ArrayBuffer(bytes);
+        const v = new Uint8Array(b);
+        for (let i = 0; i < v.length; i += 16384) v[i] = i & 0xff;
+      }
+      abAllocCount++;
+      abAllocBytes += bytes;
+    } catch (e) {
+      // OOM — swallow, keep going
+    }
+  }
+
+  const now = performance.now();
+  if (now - abLastT >= 500) {
+    abRate = (abAllocBytes - abLastBytes) /
+             ((now - abLastT) / 1000) / (1024 * 1024);
+    abLastT = now;
+    abLastBytes = abAllocBytes;
+  }
+}
+
+// ---- 2. Building enormous arrays of objects / strings ----
+const BIG_OBJECT_COUNT = 200000;
+let objArrayCount = 0;
+let objArrayRate  = 0;
+let objLastT      = performance.now();
+let objLastCount  = 0;
+
+function buildHugeObjectArray() {
+  const arr = new Array(BIG_OBJECT_COUNT);
+  for (let i = 0; i < BIG_OBJECT_COUNT; i++) {
+    arr[i] = {
+      id: i,
+      name: 'item_' + i,
+      tags: ['a', 'b', 'c', (i & 7).toString()],
+      nested: {
+        v: i * 0.5,
+        flag: (i & 1) === 1,
+        meta: { depth: 3, label: 'x' + i },
+      },
+      desc: 'object number ' + i + ' with some extra text',
+    };
+  }
+  // force a read so V8 can't optimize it away
+  let acc = 0;
+  for (let i = 0; i < arr.length; i += 1024) acc += arr[i].id;
+  objArrayCount += BIG_OBJECT_COUNT;
+
+  const now = performance.now();
+  if (now - objLastT >= 500) {
+    objArrayRate = (objArrayCount - objLastCount) /
+                   ((now - objLastT) / 1000);
+    objLastT = now;
+    objLastCount = objArrayCount;
+  }
+  return acc;
+}
+
+// ---- 3. Massive JSON.parse ----
+let hugeJsonString = '';
+let jsonParseCount = 0;
+let jsonParseBytes = 0;
+let jsonRate       = 0;
+let jsonLastT      = performance.now();
+let jsonLastBytes  = 0;
+
+function buildHugeJsonString() {
+  // Build ~8–12 MB of JSON once.
+  const N = 60000;
+  const rows = new Array(N);
+  for (let i = 0; i < N; i++) {
+    rows[i] = JSON.stringify({
+      id: i,
+      uuid: 'u-' + i + '-' + (i * 7919).toString(36),
+      value: Math.sin(i) * 1000,
+      tags: ['alpha', 'beta', 'gamma', (i & 15).toString()],
+      nested: { a: [1, 2, 3, 4, 5], b: 'x'.repeat(16), c: i * 3.14 },
+    });
+  }
+  return '[' + rows.join(',') + ']';
+}
+hugeJsonString = buildHugeJsonString();
+
+function parseHugeJson() {
+  try {
+    const obj = JSON.parse(hugeJsonString);
+    // touch to keep it alive
+    let acc = 0;
+    for (let i = 0; i < obj.length; i += 4096) acc += obj[i].id;
+    jsonParseCount++;
+    jsonParseBytes += hugeJsonString.length;
+  } catch (e) { /* ignore */ }
+
+  const now = performance.now();
+  if (now - jsonLastT >= 500) {
+    jsonRate = (jsonParseBytes - jsonLastBytes) /
+               ((now - jsonLastT) / 1000) / (1024 * 1024);
+    jsonLastT = now;
+    jsonLastBytes = jsonParseBytes;
+  }
+}
+
+// ---- 4. String concatenation in a loop ----
+const STRING_CONCAT_ITERS = 40000;
+let concatCount = 0;
+let concatChars = 0;
+let concatRate  = 0;
+let concatLastT = performance.now();
+let concatLastC = 0;
+
+function concatStrings() {
+  let s = '';
+  for (let i = 0; i < STRING_CONCAT_ITERS; i++) {
+    // Each iteration creates a new intermediate string.
+    s += 'chunk_' + i + ':' + (i * 31) + ';';
+  }
+  concatCount += STRING_CONCAT_ITERS;
+  concatChars += s.length;
+
+  const now = performance.now();
+  if (now - concatLastT >= 500) {
+    concatRate = (concatCount - concatLastC) /
+                 ((now - concatLastT) / 1000);
+    concatLastT = now;
+    concatLastC = concatCount;
+  }
+  return s.length;
+}
+
+// ---- 5. WebAssembly Memory.grow() ----
+let wasmMemory = null;
+let wasmPages  = 0;
+let wasmGrowCount = 0;
+let wasmTotalPages = 0;
+try {
+  // start with 16 pages = 1 MB
+  wasmMemory = new WebAssembly.Memory({ initial: 16, maximum: 32768 });
+  wasmPages  = 16;
+} catch (e) {
+  console.error('WASM memory unavailable:', e);
+}
+
+function wasmMemoryGrow() {
+  if (!wasmMemory) return;
+  try {
+    // Grow by 16 pages (1 MB) at a time; reset when we hit ~256 MB.
+    if (wasmPages >= 4096) {           // 4096 pages = 256 MB
+      // Cannot shrink; allocate a fresh one
+      wasmMemory = new WebAssembly.Memory({ initial: 16, maximum: 32768 });
+      wasmPages  = 16;
+    }
+    const before = wasmMemory.buffer.byteLength;
+    wasmPages  = wasmMemory.grow(16);
+    const after = wasmMemory.buffer.byteLength;
+    wasmGrowCount++;
+    wasmTotalPages += (after - before) / 65536;
+
+    // touch the newly grown region so pages commit
+    const view = new Uint8Array(wasmMemory.buffer);
+    for (let i = before; i < after; i += 4096) view[i] = i & 0xff;
+  } catch (e) {
+    // OOM; start over
+    try {
+      wasmMemory = new WebAssembly.Memory({ initial: 16, maximum: 32768 });
+      wasmPages  = 16;
+    } catch (_) { wasmMemory = null; }
+  }
+}
+
+// ---- schedule the memory bombs on staggered intervals ----
+// Doing all of these every frame would instantly crash the tab.
+const memoryIntervals = [];
+memoryIntervals.push(setInterval(allocBigBuffers,      150));
+memoryIntervals.push(setInterval(buildHugeObjectArray, 250));
+memoryIntervals.push(setInterval(parseHugeJson,        300));
+memoryIntervals.push(setInterval(concatStrings,        120));
+memoryIntervals.push(setInterval(wasmMemoryGrow,       200));
+
+// ==================================================================
+// WEB AUDIO — heavy graph
+// ==================================================================
+let audioCtx        = null;
+let audioStarted    = false;
+let audioOscCount   = 0;
+let audioSPBlocks   = 0;
+let audioSPRate     = 0;
+let audioSPLastT    = performance.now();
+let audioSPLastB    = 0;
+
+function makeImpulseResponse(ctx, seconds, decay) {
+  const rate = ctx.sampleRate;
+  const len  = Math.max(1, Math.floor(rate * seconds));
+  const ir   = ctx.createBuffer(2, len, rate);
+  for (let ch = 0; ch < 2; ch++) {
+    const data = ir.getChannelData(ch);
+    for (let i = 0; i < len; i++) {
+      const t = i / len;
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, decay);
+    }
+  }
+  return ir;
+}
+
+function makeDistortionCurve(amount) {
+  const n = 65536;
+  const curve = new Float32Array(n);
+  const deg = Math.PI / 180;
+  for (let i = 0; i < n; i++) {
+    const x = (i * 2) / n - 1;
+    curve[i] = ((3 + amount) * x * 20 * deg) /
+               (Math.PI + amount * Math.abs(x));
+  }
+  return curve;
+}
+
+function startAudio() {
+  if (audioStarted) return;
+  const Ctor = window.AudioContext || window.webkitAudioContext;
+  if (!Ctor) { console.warn('Web Audio not available'); return; }
+
+  try {
+    audioCtx = new Ctor({ latencyHint: 'playback' });
+  } catch (e) {
+    console.error('AudioContext failed:', e);
+    return;
+  }
+  audioStarted = true;
+
+  const master = audioCtx.createGain();
+  master.gain.value = 0.0008;
+
+  const convolver = audioCtx.createConvolver();
+  convolver.buffer = makeImpulseResponse(audioCtx, 6.0, 3.0);
+
+  const f1 = audioCtx.createBiquadFilter();
+  f1.type = 'lowpass'; f1.frequency.value = 1200; f1.Q.value = 8;
+
+  const f2 = audioCtx.createBiquadFilter();
+  f2.type = 'highpass'; f2.frequency.value = 80; f2.Q.value = 4;
+
+  const f3 = audioCtx.createBiquadFilter();
+  f3.type = 'peaking'; f3.frequency.value = 880; f3.Q.value = 12; f3.gain.value = 12;
+
+  const shaper = audioCtx.createWaveShaper();
+  shaper.curve = makeDistortionCurve(50);
+  shaper.oversample = '4x';
+
+  const BLOCK = 4096;
+  let sp = null;
+  try { sp = audioCtx.createScriptProcessor(BLOCK, 2, 2); } catch (e) {
+    try { sp = audioCtx.createJavaScriptNode(BLOCK, 2, 2); } catch (_) {}
+  }
+
+  const delaySize = audioCtx.sampleRate * 2;
+  const dlL = new Float32Array(delaySize);
+  const dlR = new Float32Array(delaySize);
+  let dptr = 0;
+  const fb = 0.72;
+
+  if (sp) {
+    sp.onaudioprocess = (e) => {
+      const inL = e.inputBuffer.getChannelData(0);
+      const inR = e.inputBuffer.getChannelData(1);
+      const outL = e.outputBuffer.getChannelData(0);
+      const outR = e.outputBuffer.getChannelData(1);
+      const len = outL.length;
+      for (let i = 0; i < len; i++) {
+        const l = inL[i], r = inR[i];
+        const dL = dlL[dptr], dR = dlR[dptr];
+        const mod = Math.sin((dptr + i) * 0.00013) * 0.08;
+        const yL = l * 0.6 + dL * fb + mod * dR;
+        const yR = r * 0.6 + dR * fb + mod * dL;
+        outL[i] = Math.tanh(yL * 1.4);
+        outR[i] = Math.tanh(yR * 1.4);
+        dlL[dptr] = yL + l * 0.25;
+        dlR[dptr] = yR + r * 0.25;
+        dptr++;
+        if (dptr >= delaySize) dptr = 0;
+      }
+      audioSPBlocks++;
+      const now = performance.now();
+      if (now - audioSPLastT >= 500) {
+        audioSPRate = (audioSPBlocks - audioSPLastB) /
+                      ((now - audioSPLastT) / 1000) * BLOCK / audioCtx.sampleRate;
+        audioSPLastT = now;
+        audioSPLastB = audioSPBlocks;
+      }
+    };
+  }
+
+  const oscCount = 32;
+  const oscTypes = ['sine', 'square', 'sawtooth', 'triangle'];
+  for (let i = 0; i < oscCount; i++) {
+    const osc = audioCtx.createOscillator();
+    osc.type = oscTypes[i % oscTypes.length];
+    osc.frequency.value = 55 * Math.pow(2, (i % 12) / 12) *
+                          (1 + (Math.random() - 0.5) * 0.01);
+    const g = audioCtx.createGain();
+    g.gain.value = 0.01;
+
+    const lfo = audioCtx.createOscillator();
+    lfo.type = 'sine';
+    lfo.frequency.value = 0.1 + Math.random() * 4;
+    const lfoGain = audioCtx.createGain();
+    lfoGain.gain.value = 8;
+    lfo.connect(lfoGain);
+    lfoGain.connect(osc.detune);
+
+    osc.connect(g);
+    g.connect(f1);
+    osc.start();
+    lfo.start();
+    audioOscCount++;
+  }
+
+  f1.connect(f2);
+  f2.connect(f3);
+  f3.connect(shaper);
+  shaper.connect(convolver);
+  convolver.connect(master);
+
+  if (sp) { master.connect(sp); sp.connect(audioCtx.destination); }
+  else    { master.connect(audioCtx.destination); }
+
+  const masterLFO = audioCtx.createOscillator();
+  masterLFO.frequency.value = 0.07;
+  const masterLFOGain = audioCtx.createGain();
+  masterLFOGain.gain.value = 400;
+  masterLFO.connect(masterLFOGain);
+  masterLFOGain.connect(f1.frequency);
+  masterLFO.start();
+}
+
+const gate = document.getElementById('audio-gate');
+function armAudio() {
+  gate.classList.add('hidden');
+  try { startAudio(); } catch (e) { console.error('audio start failed', e); }
+  if (audioCtx && audioCtx.state === 'suspended') {
+    audioCtx.resume().catch(() => {});
+  }
+  window.removeEventListener('pointerdown', armAudio);
+  window.removeEventListener('keydown', armAudio);
+}
+window.addEventListener('pointerdown', armAudio);
+window.addEventListener('keydown', armAudio);
+
+// ==================================================================
+// Main frame loop + HUD
+// ==================================================================
+const hud = document.getElementById('hud');
+let frames        = 0;
+let lastUpdate    = performance.now();
+let lastMainInfo  = 'initialising…';
+let lastParticles = 0;
+
+function tick() {
+  const t = nowSec();
+
+  // 1) burn main thread
+  burnMainThread(MAIN_LOOP_BUDGET_MS);
+
+  // 2) DOM layout thrash
+  thrashLayout();
+
+  // 3) heavy WebGL work
+  if (window.__mainState) {
+    const r = window.__mainState.frame(t);
+    if (r && r.info) lastMainInfo = r.info;
+  }
+  if (window.__particlesState) {
+    lastParticles = window.__particlesState.frame(t);
+  }
+  if (window.__texState) {
+    window.__texState.frame(t);
+  }
+
+  // 4) HUD
+  frames++;
+  const now = performance.now();
+  if (now - lastUpdate >= 500) {
+    const fps = (frames * 1000) / (now - lastUpdate);
+
+    let workerTotal = 0, workerActive = 0;
+    for (let i = 0; i < workerRates.length; i++) {
+      if (workerRates[i] > 0) { workerActive++; workerTotal += workerRates[i]; }
+    }
+
+    const audioState = audioCtx
+      ? `${audioCtx.state} · ${audioOscCount} osc · SP ${(audioSPRate * 100).toFixed(1)}%`
+      : 'not started (click page)';
+
+    let memInfo = 'n/a';
+    if (performance.memory) {
+      const m = performance.memory;
+      memInfo = `${(m.usedJSHeapSize / 1048576).toFixed(0)} MB used / ` +
+                `${(m.totalJSHeapSize / 1048576).toFixed(0)} MB total / ` +
+                `limit ${(m.jsHeapSizeLimit / 1048576).toFixed(0)} MB`;
+    }
+
+    const wasmMB = wasmMemory
+      ? (wasmMemory.buffer.byteLength / 1048576).toFixed(1) + ' MB'
+      : 'unavailable';
+
+    hud.textContent =
+      `fps              : ${fps.toFixed(1)}\n` +
+      `main canvas      : ${lastMainInfo}\n` +
+      `particles ctx    : ${lastParticles} draw calls / frame\n` +
+      `texture ctx      : ping-pong RTT + 32-tap blur · 4096² source\n` +
+      `webgl contexts   : 3   ·   FBOs: 6   ·   textures: ~7\n` +
+      `main-thread loop : ${(mainThreadRate / 1e6).toFixed(2)} M ops/s\n` +
+      `web workers      : ${workerActive}/${NUM_WORKERS} · ` +
+        `${(workerTotal / 1e6).toFixed(2)} M ops/s total\n` +
+      `layout thrash    : ${(thrashRate / 1000).toFixed(1)} k forced reflows/s\n` +
+      `timers           : interval ${intervalTicks} · ` +
+        `timeout ${timeoutTicks} · timeout2 ${timeoutTicks2}\n` +
+      `web audio        : ${audioState}\n` +
+      `ArrayBuffer churn: ${(abRate).toFixed(1)} MB/s · ${abAllocCount} allocs\n` +
+      `object arrays    : ${(objArrayRate / 1000).toFixed(1)} k objs/s · ` +
+        `${objArrayCount} total\n` +
+      `JSON.parse       : ${(jsonRate).toFixed(1)} MB/s · ` +
+        `${jsonParseCount} parses\n` +
+      `string concat    : ${(concatRate / 1000).toFixed(1)} k concats/s · ` +
+        `${(concatChars / 1048576).toFixed(1)} MB built\n` +
+      `wasm memory      : ${wasmMB} · ${wasmGrowCount} grows · ` +
+        `${(wasmTotalPages * 65536 / 1048576).toFixed(0)} MB grown total\n` +
+      `heap             : ${memInfo}`;
+
+    frames = 0;
+    lastUpdate = now;
+  }
+
+  requestAnimationFrame(tick);
+}
+
+requestAnimationFrame(tick);
+
+// ==================================================================
+// Context-loss warnings
+// ==================================================================
+for (const id of ['main', 'particles', 'texDemo']) {
+  const c = document.getElementById(id);
+  if (c) {
+    c.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+      console.warn('WebGL context lost on #' + id);
+    });
+  }
+}
+
+// ==================================================================
+// Cleanup
+// ==================================================================
+window.addEventListener('beforeunload', () => {
+  for (const w of workers) { try { w.terminate(); } catch (_) {} }
+  try { URL.revokeObjectURL(workerURL); } catch (_) {}
+  for (const id of intervals)        { try { clearInterval(id); } catch (_) {} }
+  for (const id of memoryIntervals)  { try { clearInterval(id); } catch (_) {} }
+  if (audioCtx) { try { audioCtx.close(); } catch (_) {} }
+});
+
+})();
+</script>
+</body>
+</html>
